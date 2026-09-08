@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0e17">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<title>BTC 사이클 밸류에이션 대시보드</title>
+<style>
+  :root{
+    --bg:#0a0e17; --bg2:#0f1626; --panel:#121a2c; --panel2:#161f35;
+    --line:#232c42; --text:#e7ebf5; --muted:#7c8aa5;
+    --gold:#f5a623; --teal:#2dd4bf; --coral:#fb7185;
+    --blue:#38bdf8; --green:#4ade80; --yellow:#facc15; --red:#f87171;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    margin:0; background:
+      radial-gradient(1100px 600px at 15% -10%, #14203a 0%, transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, #1a1330 0%, transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Pretendard,"Noto Sans KR",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums}
+  a{color:var(--blue)}
+
+  header{
+    padding:18px 18px 14px; position:sticky; top:0; z-index:5;
+    background:rgba(10,14,23,.86); backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap}
+  .brand .left{display:flex; align-items:center; gap:10px}
+  .brand .mark{
+    width:34px; height:34px; border-radius:10px; flex:none;
+    background:linear-gradient(160deg,var(--gold),#e08e12);
+    display:flex; align-items:center; justify-content:center;
+    color:#0a0e17; font-weight:800; font-size:17px;
+  }
+  h1{margin:0; font-size:18px; font-weight:700; letter-spacing:-.01em}
+  .sub{color:var(--muted); font-size:12.5px; margin-top:2px}
+  .navlink{
+    background:var(--panel2); color:var(--text); border:1px solid var(--line);
+    border-radius:10px; padding:9px 12px; font-size:13px; font-weight:600; text-decoration:none;
+  }
+
+  main{max-width:1200px; margin:0 auto; padding:16px 18px 40px}
+
+  .grid4{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:16px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:16px}
+  .card .k{font-size:12px; color:var(--muted); font-weight:600}
+  .card .v{font-size:26px; font-weight:800; margin-top:6px; letter-spacing:-.02em}
+  .card .tag{display:inline-block; margin-top:8px; padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:700}
+  .zone-blue{background:#0c2a3d; color:var(--blue)}
+  .zone-green{background:#0f2e20; color:var(--green)}
+  .zone-yellow{background:#332a0c; color:var(--yellow)}
+  .zone-red{background:#3a1420; color:var(--red)}
+  .zone-muted{background:transparent; color:var(--muted); border:1px solid var(--line)}
+
+  section{margin-top:20px}
+  .panel{border:1px solid var(--line); border-radius:16px; background:var(--panel); padding:16px}
+  .phead{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:6px}
+  .phead h2{margin:0; font-size:15px; font-weight:700}
+  .phead select{
+    background:var(--panel2); color:var(--text); border:1px solid var(--line);
+    border-radius:9px; padding:7px 10px; font-size:12.5px; font-weight:600;
+  }
+  .pdesc{margin:0 0 10px; font-size:12.5px; color:var(--muted); line-height:1.6}
+  canvas.chart{width:100%; display:block; background:var(--bg2); border-radius:10px; border:1px solid var(--line)}
+  #priceChart{height:420px}
+  #mmChart{height:160px}
+  #fngChart{height:120px}
+  @media(max-width:760px){ #priceChart{height:300px} #mmChart{height:130px} }
+
+  .legend2{display:flex; flex-wrap:wrap; gap:10px 16px; font-size:11.5px; color:var(--muted); margin-top:10px}
+  .legend2 span{display:inline-flex; align-items:center; gap:5px}
+  .sw{width:10px; height:10px; border-radius:3px; display:inline-block}
+
+  .fng-row{display:flex; align-items:center; gap:22px; flex-wrap:wrap}
+  .fng-gauge{flex:none}
+  .fng-info .v{font-size:34px; font-weight:800}
+  .fng-info .k{font-size:12.5px; color:var(--muted)}
+
+  .note{font-size:12px; color:var(--muted); line-height:1.7; margin-top:10px}
+  footer{margin-top:26px; color:var(--muted); font-size:11.5px; text-align:center}
+  .loading{color:var(--muted); font-size:12.5px; text-align:center; padding:40px 0}
+
+  @media(max-width:900px){ .grid4{grid-template-columns:1fr 1fr} }
+  @media(max-width:520px){ .grid4{grid-template-columns:1fr} .fng-row{justify-content:center; text-align:center} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="left">
+      <div class="mark">Ⓜ</div>
+      <div>
+        <h1>BTC 사이클 밸류에이션 대시보드</h1>
+        <div class="sub">메이어 배수(Mayer Multiple) · 공포·탐욕지수 · 알트코인 시즌 · BTC 도미넌스</div>
+      </div>
+    </div>
+    <a class="navlink" href="index.html">← 상대강도 레이더로</a>
+  </div>
+</header>
+
+<main>
+  <div class="grid4" id="statCards">
+    <div class="card"><div class="k">BTC 현재가</div><div class="v mono" id="statPrice">--</div></div>
+    <div class="card"><div class="k">메이어 배수 (가격÷200일 평균)</div><div class="v mono" id="statMM">--</div><span class="tag zone-muted" id="statMMTag">계산 중</span></div>
+    <div class="card"><div class="k">공포·탐욕 지수</div><div class="v mono" id="statFng">--</div><span class="tag zone-muted" id="statFngTag">계산 중</span></div>
+    <div class="card"><div class="k">BTC 도미넌스</div><div class="v mono" id="statDom">--</div></div>
+  </div>
+
+  <section>
+    <div class="panel">
+      <div class="phead">
+        <h2>BTC 장기 가격 차트 (메이어 배수 구간 색상)</h2>
+        <select id="rangeSel">
+          <option value="365">최근 1년</option>
+          <option value="1460">최근 4년(반감기 한 사이클)</option>
+          <option value="99999" selected>전체 기간 (2017년~)</option>
+        </select>
+      </div>
+      <p class="pdesc">가격 로그 스케일 · 바이낸스 BTCUSDT 상장(2017년 8월) 이후 전체 일봉 데이터 기준. 선 색깔은 그 날의 "메이어 배수"(현재가 ÷ 200일 이동평균) 구간을 나타냅니다 — MVRV Z-Score 차트를 보는 방식과 동일한 개념입니다. 단, 이건 온체인 실현가치가 아니라 순수 가격 데이터로 계산한 근사 지표입니다.</p>
+      <canvas id="priceChart" class="chart"></canvas>
+      <div class="legend2">
+        <span><i class="sw" style="background:#38bdf8"></i>&lt; 1.0 저평가(과거 사이클 저점권)</span>
+        <span><i class="sw" style="background:#4ade80"></i>1.0~1.5 중립</span>
+        <span><i class="sw" style="background:#facc15"></i>1.5~2.4 다소 과열</span>
+        <span><i class="sw" style="background:#f87171"></i>&gt; 2.4 역사적 과열(과거 사이클 고점권)</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <div class="phead"><h2>메이어 배수 추이</h2></div>
+      <p class="pdesc">1.0 아래(파란 점선)는 역사적으로 매수 관심 구간, 2.4 위(빨간 점선)는 역사적으로 과열 구간으로 언급되어온 임계값입니다. 절대적 기준은 아닙니다.</p>
+      <canvas id="mmChart" class="chart"></canvas>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <div class="phead"><h2>공포·탐욕 지수</h2></div>
+      <p class="pdesc">0에 가까울수록 극단적 공포(패닉 매도 구간), 100에 가까울수록 극단적 탐욕(과열 구간). 극단값 자체가 종종 단기 반전 신호로 언급됩니다.</p>
+      <div class="fng-row">
+        <div class="fng-gauge"><canvas id="fngGauge" width="220" height="130"></canvas></div>
+        <div class="fng-info">
+          <div class="v" id="fngValue">--</div>
+          <div class="k" id="fngLabel">불러오는 중…</div>
+        </div>
+        <div style="flex:1; min-width:220px">
+          <canvas id="fngChart" class="chart"></canvas>
+          <div class="note" style="margin-top:6px">최근 90일 추이</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <div class="phead"><h2>알트코인 시즌 지수 (참고용)</h2><button id="altRefresh" type="button" class="navlink" style="cursor:pointer">새로고침</button></div>
+      <p class="pdesc">시가총액 상위 50개 코인 중, 최근 90일간 BTC보다 더 많이 오른 코인의 비율입니다. 75 이상이면 통상 "알트시즌", 25 이하면 "비트코인 시즌"으로 분류됩니다.</p>
+      <div id="altBox" class="loading">불러오려면 "새로고침"을 눌러주세요 (무료 API 호출 제한 때문에 자동 실행하지 않습니다)</div>
+    </div>
+  </section>
+
+  <p class="note">
+    데이터 출처: 가격(메이어 배수 계산용) — 바이낸스 공개 API(무료, 키 불필요, 2017년 8월~) · 시총·도미넌스·알트시즌 — CoinGecko 공개 API(무료, 키 불필요) · 공포탐욕지수 — Alternative.me(무료, 키 불필요).
+    메이어 배수는 실제 온체인 MVRV가 아니라 가격만으로 계산한 근사 지표이며, 모든 지표는 과거 패턴을 보여줄 뿐 미래를 보장하지 않습니다.
+  </p>
+  <footer>투자 참고용 정보이며 투자 조언이 아닙니다 · 매매 기능 없음</footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmtUsd = n => "$" + n.toLocaleString(undefined,{maximumFractionDigits:0});
+let dailyPrices = []; // {t, price, ma200, mm}
+let fngData = [];     // {t, value}
+
+function zoneOf(mm){
+  if(mm < 1.0) return {name:"저평가", cls:"zone-blue", color:"#38bdf8"};
+  if(mm < 1.5) return {name:"중립", cls:"zone-green", color:"#4ade80"};
+  if(mm < 2.4) return {name:"다소 과열", cls:"zone-yellow", color:"#facc15"};
+  return {name:"역사적 과열", cls:"zone-red", color:"#f87171"};
+}
+function fngZone(v){
+  if(v <= 24) return {name:"극단적 공포", cls:"zone-blue"};
+  if(v <= 44) return {name:"공포", cls:"zone-green"};
+  if(v <= 55) return {name:"중립", cls:"zone-green"};
+  if(v <= 74) return {name:"탐욕", cls:"zone-yellow"};
+  return {name:"극단적 탐욕", cls:"zone-red"};
+}
+
+async function loadPriceData(){
+  // 바이낸스 BTCUSDT 상장(2017-08-17) 이후 전체 일봉 데이터를 페이지네이션으로 수집
+  const start = Date.UTC(2017, 7, 17);
+  let cursor = start;
+  const now = Date.now();
+  let klines = [];
+  while(cursor < now){
+    const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${cursor}&limit=1000`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("binance klines fetch failed: " + res.status);
+    const rows = await res.json();
+    if(!rows.length) break;
+    klines = klines.concat(rows);
+    const lastOpen = rows[rows.length-1][0];
+    if(rows.length < 1000) break;
+    cursor = lastOpen + 86400000;
+  }
+  const series = klines.map(k => ({ t: k[0], price: parseFloat(k[4]) })); // k[4] = 종가
+
+  // 200일 이동평균 & 메이어 배수 계산
+  let sum = 0;
+  const out = [];
+  for(let i=0;i<series.length;i++){
+    sum += series[i].price;
+    if(i >= 200) sum -= series[i-200].price;
+    if(i >= 199){
+      const ma = sum / 200;
+      out.push({ t: series[i].t, price: series[i].price, ma200: ma, mm: series[i].price / ma });
+    }
+  }
+  dailyPrices = out;
+}
+
+async function loadFng(){
+  const res = await fetch("https://api.alternative.me/fng/?limit=0&format=json");
+  if(!res.ok) throw new Error("fng fetch failed: " + res.status);
+  const json = await res.json();
+  fngData = json.data.map(d => ({ t: +d.timestamp*1000, value: +d.value })).reverse(); // 과거→현재 순
+}
+
+async function loadDominance(){
+  try{
+    const res = await fetch("https://api.coingecko.com/api/v3/global");
+    const json = await res.json();
+    const dom = json.data.market_cap_percentage.btc;
+    $("statDom").textContent = dom.toFixed(1) + "%";
+  }catch(e){ $("statDom").textContent = "오류"; }
+}
+
+function updateStatCards(){
+  if(!dailyPrices.length) return;
+  const last = dailyPrices[dailyPrices.length-1];
+  $("statPrice").textContent = fmtUsd(last.price);
+  $("statMM").textContent = last.mm.toFixed(2) + "×";
+  const z = zoneOf(last.mm);
+  const mmTag = $("statMMTag"); mmTag.textContent = z.name; mmTag.className = "tag " + z.cls;
+
+  if(fngData.length){
+    const f = fngData[fngData.length-1];
+    $("statFng").textContent = f.value;
+    const fz = fngZone(f.value);
+    const fngTag = $("statFngTag"); fngTag.textContent = fz.name; fngTag.className = "tag " + fz.cls;
+    $("fngValue").textContent = f.value;
+    $("fngLabel").textContent = fz.name + " · " + new Date(f.t).toLocaleDateString();
+  }
+}
+
+function drawPriceChart(){
+  const cv = $("priceChart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if(w===0||h===0||!dailyPrices.length) return;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const days = +$("rangeSel").value;
+  const cutoff = Date.now() - days*86400000;
+  const data = dailyPrices.filter(d => d.t >= cutoff);
+  if(data.length < 2) return;
+
+  const L=64, R=14, T=14, B=26, pw=w-L-R, ph=h-T-B;
+  const prices = data.map(d=>d.price);
+  const logMin = Math.log10(Math.min(...prices)*0.9);
+  const logMax = Math.log10(Math.max(...prices)*1.1);
+  const t0 = data[0].t, t1 = data[data.length-1].t;
+
+  const xOf = t => L + (t-t0)/(t1-t0)*pw;
+  const yOf = price => T + (logMax - Math.log10(price))/(logMax-logMin)*ph;
+
+  // 그리드 & y축 라벨(로그 스케일)
+  ctx.strokeStyle="#232c42"; ctx.lineWidth=1; ctx.font="10.5px ui-monospace,Menlo,monospace";
+  const gridVals = [];
+  for(let e=Math.floor(logMin); e<=Math.ceil(logMax); e++){
+    [1,2,5].forEach(m=>{ const v=m*Math.pow(10,e); if(v>=Math.pow(10,logMin)&&v<=Math.pow(10,logMax)) gridVals.push(v); });
+  }
+  gridVals.forEach(v=>{
+    const y=yOf(v);
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke();
+    ctx.fillStyle="#7c8aa5";
+    const label = v>=1000 ? "$"+Math.round(v/1000)+"k" : "$"+Math.round(v);
+    ctx.fillText(label, 4, y+3.5);
+  });
+
+  // x축 연도 라벨
+  const y0=new Date(t0).getFullYear(), y1=new Date(t1).getFullYear();
+  ctx.textAlign="center";
+  for(let y=y0;y<=y1;y++){
+    const t=new Date(y,0,1).getTime();
+    if(t<t0||t>t1) continue;
+    const x=xOf(t);
+    ctx.strokeStyle="#1a2440"; ctx.beginPath(); ctx.moveTo(x,T); ctx.lineTo(x,h-B); ctx.stroke();
+    ctx.fillStyle="#7c8aa5"; ctx.fillText(String(y), x, h-8);
+  }
+  ctx.textAlign="left";
+
+  // 메이어 배수 구간별 색상 선분
+  for(let i=1;i<data.length;i++){
+    const a=data[i-1], b=data[i];
+    ctx.strokeStyle = zoneOf(b.mm).color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(xOf(a.t), yOf(a.price));
+    ctx.lineTo(xOf(b.t), yOf(b.price));
+    ctx.stroke();
+  }
+}
+
+function drawMMChart(){
+  const cv = $("mmChart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if(w===0||h===0||!dailyPrices.length) return;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const days = +$("rangeSel").value;
+  const cutoff = Date.now() - days*86400000;
+  const data = dailyPrices.filter(d => d.t >= cutoff);
+  if(data.length < 2) return;
+
+  const L=36, R=14, T=10, B=8, pw=w-L-R, ph=h-T-B;
+  const mmVals = data.map(d=>d.mm);
+  const max = Math.max(3, ...mmVals) * 1.05;
+  const min = 0;
+  const t0=data[0].t, t1=data[data.length-1].t;
+  const xOf = t => L + (t-t0)/(t1-t0)*pw;
+  const yOf = v => T + (max-v)/(max-min)*ph;
+
+  ctx.strokeStyle="#232c42"; ctx.lineWidth=1; ctx.font="10px ui-monospace,Menlo,monospace";
+  [0,1,2,3].forEach(v=>{
+    if(v>max) return;
+    const y=yOf(v);
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke();
+    ctx.fillStyle="#7c8aa5"; ctx.fillText(v+"×", 2, y+3);
+  });
+
+  // 임계선 1.0, 2.4
+  ctx.setLineDash([4,4]);
+  ctx.strokeStyle="#38bdf8"; ctx.beginPath(); ctx.moveTo(L,yOf(1)); ctx.lineTo(w-R,yOf(1)); ctx.stroke();
+  ctx.strokeStyle="#f87171"; ctx.beginPath(); ctx.moveTo(L,yOf(2.4)); ctx.lineTo(w-R,yOf(2.4)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle="#a78bfa"; ctx.lineWidth=1.6; ctx.beginPath();
+  data.forEach((d,i)=>{ const x=xOf(d.t), y=yOf(d.mm); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+}
+
+function drawFngGauge(){
+  const cv = $("fngGauge");
+  const ctx = cv.getContext("2d");
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0,0,w,h);
+  const cx=w/2, cy=h-10, r=90;
+  const zones = [
+    {from:0, to:25, color:"#38bdf8"},
+    {from:25, to:45, color:"#4ade80"},
+    {from:45, to:55, color:"#a3e635"},
+    {from:55, to:75, color:"#facc15"},
+    {from:75, to:100, color:"#f87171"},
+  ];
+  zones.forEach(z=>{
+    const a0 = Math.PI + (z.from/100)*Math.PI;
+    const a1 = Math.PI + (z.to/100)*Math.PI;
+    ctx.beginPath(); ctx.arc(cx,cy,r,a0,a1); ctx.lineWidth=16; ctx.strokeStyle=z.color; ctx.stroke();
+  });
+  if(fngData.length){
+    const v = fngData[fngData.length-1].value;
+    const a = Math.PI + (v/100)*Math.PI;
+    const nx = cx + Math.cos(a)*(r-24), ny = cy + Math.sin(a)*(r-24);
+    ctx.strokeStyle="#e7ebf5"; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(nx,ny); ctx.stroke();
+    ctx.fillStyle="#e7ebf5"; ctx.beginPath(); ctx.arc(cx,cy,4,0,7); ctx.fill();
+  }
+}
+
+function drawFngChart(){
+  const cv = $("fngChart");
+  const dpr = window.devicePixelRatio||1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if(w===0||h===0||!fngData.length) return;
+  cv.width=w*dpr; cv.height=h*dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  const data = fngData.slice(-90);
+  const L=28,R=8,T=8,B=8,pw=w-L-R,ph=h-T-B;
+  const t0=data[0].t, t1=data[data.length-1].t;
+  const xOf = t => L + (t-t0)/(t1-t0||1)*pw;
+  const yOf = v => T + (100-v)/100*ph;
+  ctx.strokeStyle="#232c42"; ctx.lineWidth=1; ctx.font="9.5px ui-monospace,Menlo,monospace";
+  [0,50,100].forEach(v=>{ const y=yOf(v); ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke(); ctx.fillStyle="#7c8aa5"; ctx.fillText(v,2,y+3); });
+  ctx.strokeStyle="#facc15"; ctx.lineWidth=1.6; ctx.beginPath();
+  data.forEach((d,i)=>{ const x=xOf(d.t), y=yOf(d.value); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+}
+
+function drawAll(){ drawPriceChart(); drawMMChart(); drawFngChart(); drawFngGauge(); }
+
+$("rangeSel").onchange = drawAll;
+window.addEventListener("resize", drawAll);
+
+$("altRefresh").onclick = async () => {
+  $("altBox").className = "loading";
+  $("altBox").textContent = "불러오는 중…";
+  try{
+    const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&price_change_percentage=90d");
+    const list = await res.json();
+    const btc = list.find(c => c.id === "bitcoin");
+    if(!btc) throw new Error("no btc");
+    const btcChg = btc.price_change_percentage_90d_in_currency;
+    const alts = list.filter(c => c.id !== "bitcoin" && c.price_change_percentage_90d_in_currency != null);
+    const outperform = alts.filter(c => c.price_change_percentage_90d_in_currency > btcChg).length;
+    const idx = Math.round(outperform / alts.length * 100);
+    const label = idx >= 75 ? "알트코인 시즌" : idx <= 25 ? "비트코인 시즌" : "중립(혼조)";
+    $("altBox").className = "";
+    $("altBox").innerHTML = `<div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap">
+      <div style="font-size:32px; font-weight:800">${idx}<span style="font-size:16px; color:var(--muted)">/100</span></div>
+      <div class="tag ${idx>=75?'zone-red':idx<=25?'zone-blue':'zone-green'}" style="font-size:13px">${label}</div>
+      <div class="note" style="margin:0">시총 상위 50개 중 ${outperform}개 코인이 최근 90일간 BTC(${btcChg.toFixed(1)}%)보다 더 많이 상승</div>
+    </div>`;
+  }catch(e){
+    $("altBox").textContent = "불러오기 실패 — 잠시 후 다시 시도해주세요.";
+  }
+};
+
+(async function init(){
+  try{
+    await Promise.all([loadPriceData(), loadFng()]);
+    updateStatCards();
+    drawAll();
+    loadDominance();
+  }catch(e){
+    $("statPrice").textContent = "오류";
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
