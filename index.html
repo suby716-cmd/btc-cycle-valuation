@@ -1,458 +1,1125 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BTC 사이클 밸류에이션 대시보드</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <style>
-    :root{
-      --bg:#070d19;
-      --panel:#111a2c;
-      --panel2:#0d1525;
-      --border:#24314a;
-      --text:#eef3ff;
-      --muted:#8996ae;
-      --grid:rgba(122,142,178,.14);
-      --purple:#a987ff;
-      --blue:#37b8ff;
-      --green:#40dc88;
-      --yellow:#f4cf38;
-      --red:#ff6871;
-      --orange:#ff9b45;
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      background:linear-gradient(180deg,#080e1a 0%,#0b1322 100%);
-      color:var(--text);
-      font-family:Inter,"Noto Sans KR",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-    }
-    .wrap{max-width:1160px;margin:0 auto;padding:22px 18px 48px}
-    header{display:flex;align-items:center;gap:13px;padding:4px 0 22px}
-    .logo{
-      width:38px;height:38px;border-radius:11px;background:#f2a900;
-      display:grid;place-items:center;color:#111;font-weight:900;font-size:20px;
-      box-shadow:0 0 0 1px rgba(255,255,255,.08) inset;
-    }
-    h1{font-size:20px;margin:0 0 4px;font-weight:800;letter-spacing:-.4px}
-    .subtitle{font-size:12px;color:var(--muted)}
-    .status{margin-left:auto;font-size:11px;color:var(--muted);text-align:right}
-    .cards{
-      display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px
-    }
-    .card,.panel{
-      background:rgba(17,26,44,.94);
-      border:1px solid var(--border);
-      border-radius:15px;
-      box-shadow:0 12px 28px rgba(0,0,0,.16);
-    }
-    .card{padding:17px 18px;min-height:104px}
-    .label{font-size:11px;color:var(--muted);margin-bottom:9px}
-    .value{font-size:25px;font-weight:800;letter-spacing:-.6px}
-    .badge{
-      display:inline-block;margin-top:8px;padding:3px 9px;border-radius:999px;
-      font-size:10px;font-weight:800
-    }
-    .green{color:#07140d;background:var(--green)}
-    .yellow{color:#171306;background:var(--yellow)}
-    .blue{color:#03131d;background:var(--blue)}
-    .red{color:#210508;background:var(--red)}
-    .panel{padding:17px 17px 15px;margin-bottom:16px}
-    .panel-title{font-size:14px;font-weight:800;margin:0 0 5px}
-    .panel-desc{font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:12px}
-    .chartbox{height:380px;position:relative}
-    .chartbox.small{height:235px}
-    .mayer-wrap{height:265px;position:relative}
-    .legend{
-      display:flex;flex-wrap:wrap;gap:13px;margin-top:10px;font-size:10px;color:var(--muted)
-    }
-    .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
-    .fear-grid{display:grid;grid-template-columns:280px 1fr;gap:18px;align-items:center}
-    .gauge{
-      position:relative;width:205px;height:112px;margin:8px auto 4px;
-      overflow:hidden;
-    }
-    .gauge-bg{
-      position:absolute;left:4px;top:0;width:197px;height:197px;border-radius:50%;
-      background:conic-gradient(from 270deg,var(--blue) 0deg 58deg,var(--green) 58deg 120deg,
-      var(--yellow) 120deg 165deg,var(--red) 165deg 180deg,transparent 180deg 360deg);
-    }
-    .gauge-bg:after{
-      content:"";position:absolute;left:20px;top:20px;width:157px;height:157px;
-      background:var(--panel);border-radius:50%;
-    }
-    .needle{
-      position:absolute;left:101px;top:83px;width:3px;height:76px;
-      background:#eef3ff;transform-origin:50% 100%;border-radius:3px;
-      box-shadow:0 0 5px rgba(255,255,255,.35);
-    }
-    .needle:after{
-      content:"";position:absolute;width:9px;height:9px;background:#eef3ff;border-radius:50%;
-      left:-3px;bottom:-4px
-    }
-    .fear-number{text-align:center;font-size:31px;font-weight:900;margin-top:-1px}
-    .fear-caption{text-align:center;font-size:11px;color:var(--muted)}
-    .refresh{
-      float:right;border:1px solid #30415f;background:#1a263d;color:#dbe6ff;
-      border-radius:9px;padding:8px 12px;cursor:pointer;font-weight:700;font-size:11px
-    }
-    .refresh:hover{background:#22304b}
-    .loading{color:var(--muted);font-size:12px}
-    footer{font-size:10px;color:#71809a;line-height:1.7;margin-top:8px}
-    footer a{color:#9eb4d8}
-    .error{color:#ff9a9f;font-size:11px}
-    @media(max-width:900px){
-      .cards{grid-template-columns:repeat(2,1fr)}
-      .fear-grid{grid-template-columns:1fr}
-      .gauge{margin-left:auto;margin-right:auto}
-    }
-    @media(max-width:600px){
-      .wrap{padding:15px 10px 35px}
-      .cards{grid-template-columns:1fr 1fr;gap:8px}
-      .card{padding:13px;min-height:92px}
-      .value{font-size:20px}
-      .chartbox{height:300px}
-      .chartbox.small{height:190px}
-      .mayer-wrap{height:220px}
-      .status{display:none}
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0e17">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BTC 레이더">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<title>BTC 상대강도 레이더</title>
+<style>
+  :root{
+    --bg:#0a0e17; --bg2:#0f1626; --panel:#121a2c; --panel2:#161f35;
+    --line:#232c42; --text:#e7ebf5; --muted:#7c8aa5;
+    --gold:#f5a623; --teal:#2dd4bf; --coral:#fb7185; --violet:#8b7bff;
+    --blue:#38bdf8; --green:#4ade80; --yellow:#facc15; --red:#f87171;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    margin:0; background:
+      radial-gradient(1100px 600px at 15% -10%, #14203a 0%, transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, #1a1330 0%, transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Pretendard,"Noto Sans KR",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums}
+
+  header{
+    padding:18px 18px 14px; position:sticky; top:0; z-index:5;
+    background:rgba(10,14,23,.86); backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex; align-items:center; gap:10px}
+  .brand .mark{
+    width:34px; height:34px; border-radius:10px; flex:none;
+    background:linear-gradient(160deg,var(--gold),#e08e12);
+    display:flex; align-items:center; justify-content:center;
+    color:#0a0e17; font-weight:800; font-size:17px;
+  }
+  h1{margin:0; font-size:18px; font-weight:700; letter-spacing:-.01em}
+  .sub{color:var(--muted); font-size:12.5px; margin-top:2px}
+
+  .controls{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px}
+  select,button{
+    background:var(--panel2); color:var(--text); border:1px solid var(--line);
+    border-radius:10px; padding:9px 12px; font-size:13px; font-weight:600;
+    cursor:pointer;
+  }
+  select:focus-visible,button:focus-visible{outline:2px solid var(--teal); outline-offset:1px}
+  button:active{transform:translateY(1px)}
+  #sound.on{background:#0f2e2a; border-color:#1e5a4f; color:var(--teal)}
+  #coinToggle.on{background:#1a2440; border-color:var(--violet); color:#c8beff}
+  .navlink{
+    background:var(--panel2); color:var(--text); border:1px solid var(--line);
+    border-radius:10px; padding:9px 12px; font-size:13px; font-weight:600;
+  }
+
+  main{max-width:1200px; margin:0 auto; padding:16px 18px 40px}
+
+  .hero{
+    background:linear-gradient(160deg, var(--panel), var(--bg2));
+    border:1px solid var(--line); border-radius:18px; padding:20px;
+    display:grid; grid-template-columns:1.3fr 1fr 1fr 1fr; gap:18px;
+  }
+  .hero .item .k{font-size:12px; color:var(--muted); font-weight:600}
+  .hero .item .v{font-size:28px; font-weight:800; margin-top:6px; letter-spacing:-.02em}
+  .hero .item.main .v{font-size:38px}
+  .pos{color:var(--teal)} .neg{color:var(--coral)} .muted{color:var(--muted)}
+  .pillrow{display:flex; align-items:center; gap:8px; margin-top:8px}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none}
+  .dot.live{background:var(--teal); box-shadow:0 0 0 0 rgba(45,212,191,.6); animation:pulse 1.8s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(45,212,191,.55)}70%{box-shadow:0 0 0 9px rgba(45,212,191,0)}100%{box-shadow:0 0 0 0 rgba(45,212,191,0)}}
+
+  .event{
+    margin:16px 0; background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:14px 16px; display:flex; align-items:center; gap:12px;
+  }
+  .event .tag{font-size:20px}
+  .event b{display:block; font-size:14px}
+  .event .desc{color:var(--muted); font-size:12.5px; margin-top:2px}
+
+  /* 코인 관리 패널 */
+  .coinpanel{
+    margin-top:12px; background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:14px 16px; display:flex; flex-direction:column; gap:12px;
+  }
+  .cp-title{font-size:12px; font-weight:700; color:var(--muted); margin-bottom:6px}
+  .chips{display:flex; flex-wrap:wrap; gap:7px}
+  .chip{
+    display:inline-flex; align-items:center; gap:6px; background:var(--panel2);
+    border:1px solid var(--line); border-radius:999px; padding:5px 10px; font-size:12.5px; font-weight:700;
+  }
+  .chip.locked{opacity:.85}
+  .chip-x{
+    background:none; border:none; color:var(--muted); font-size:14px; font-weight:700;
+    padding:0; margin:0 0 0 2px; line-height:1; cursor:pointer;
+  }
+  .chip-x:hover{color:var(--coral)}
+  button.chip.add{
+    background:transparent; border:1px dashed var(--line); color:var(--muted); font-weight:600; font-size:12.5px;
+    padding:5px 10px;
+  }
+  button.chip.add:hover{border-color:var(--teal); color:var(--teal)}
+  .cp-add{display:flex; gap:8px}
+  .cp-add input{
+    flex:1; background:var(--panel2); border:1px solid var(--line); border-radius:10px;
+    color:var(--text); padding:9px 12px; font-size:13px; min-width:0;
+  }
+  .cp-note{font-size:11.5px; color:var(--muted); line-height:1.5}
+
+  section{margin-top:22px}
+  .sec-head{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px}
+  h2{font-size:14px; margin:0; color:var(--text); font-weight:700}
+  .sec-head .hint{font-size:11.5px; color:var(--muted)}
+
+  .tablewrap{border:1px solid var(--line); border-radius:14px; overflow:hidden; background:var(--panel)}
+  table{width:100%; border-collapse:collapse}
+  th,td{padding:11px 10px; border-bottom:1px solid var(--line); text-align:right; font-size:13px}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.04em; background:var(--panel2)}
+  tr:last-child td{border-bottom:none}
+  .coin{font-weight:700; display:flex; align-items:center; gap:7px}
+  .dot-sw{width:9px; height:9px; border-radius:3px; flex:none; display:inline-block}
+  .badge{padding:3px 8px; border-radius:999px; font-size:11px; font-weight:700}
+  .hit{background:#0f2e2a; color:var(--teal)}
+  .no{background:transparent; color:var(--muted); border:1px solid var(--line)}
+  .bar{position:relative; height:6px; border-radius:4px; background:var(--line); margin-top:6px; overflow:hidden}
+  .bar i{position:absolute; top:0; bottom:0; border-radius:4px}
+
+  #log{font-size:12.5px; line-height:1.7}
+  #log .row{padding:12px 16px; border-bottom:1px solid var(--line)}
+  #log .row:last-child{border-bottom:none}
+  #log .empty{padding:20px 16px; color:var(--muted); text-align:center}
+
+  .chartpanel{border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:16px}
+  .chartpanel .chead{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 16px; margin-bottom:6px}
+  .chartpanel h3{margin:0; font-size:14px; font-weight:700}
+  .chart-desc{margin:0 0 10px; font-size:12px; color:var(--muted)}
+  .legend{display:flex; flex-wrap:wrap; gap:9px 14px; font-size:11.5px; color:var(--muted)}
+  .legend span{display:inline-flex; align-items:center; gap:5px}
+  .sw{display:inline-block; width:9px; height:9px; border-radius:3px; flex:none}
+  canvas.chart{width:100%; height:380px; display:block; background:var(--bg2); border-radius:10px; border:1px solid var(--line)}
+  @media(max-width:760px){ canvas.chart{height:260px} }
+
+  .periodbtns{display:flex; gap:6px; flex-wrap:wrap}
+  .pbtn{
+    background:var(--panel2); color:var(--muted); border:1px solid var(--line);
+    border-radius:9px; padding:6px 11px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .pbtn.active{background:#1a2440; border-color:var(--violet); color:#c8beff}
+
+  #relBars{display:flex; flex-direction:column; gap:2px}
+  .relrow{display:flex; align-items:center; gap:10px; padding:7px 2px}
+  .relrow .rname{width:60px; flex:none; font-weight:700; font-size:12.5px; display:flex; align-items:center; gap:6px}
+  .relrow .rtrack{position:relative; flex:1; height:20px; background:var(--panel2); border-radius:6px; overflow:hidden}
+  .relrow .rzero{position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--line); z-index:1}
+  .relrow .rfill{position:absolute; top:2px; bottom:2px; border-radius:4px}
+  .relrow .rval{width:64px; flex:none; text-align:right; font-size:12.5px; font-weight:700; font-family:ui-monospace,Menlo,monospace}
+  #relBars .empty{padding:20px 4px; color:var(--muted); text-align:center; font-size:12.5px}
+
+  footer{margin-top:26px; color:var(--muted); font-size:11.5px; text-align:center}
+
+  /* 사이클 밸류에이션 대시보드 (상단 병합) */
+  .grid4{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:16px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:16px}
+  .card .k{font-size:12px; color:var(--muted); font-weight:600}
+  .card .v{font-size:26px; font-weight:800; margin-top:6px; letter-spacing:-.02em}
+  .card .tag{display:inline-block; margin-top:8px; padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:700}
+  .zone-blue{background:#0c2a3d; color:var(--blue)}
+  .zone-green{background:#0f2e20; color:var(--green)}
+  .zone-yellow{background:#332a0c; color:var(--yellow)}
+  .zone-red{background:#3a1420; color:var(--red)}
+  .zone-muted{background:transparent; color:var(--muted); border:1px solid var(--line)}
+  .phead select{
+    background:var(--panel2); color:var(--text); border:1px solid var(--line);
+    border-radius:9px; padding:7px 10px; font-size:12.5px; font-weight:600;
+  }
+  #priceChart{height:420px}
+  #mmChart{height:160px}
+  #fngChart{height:120px}
+  @media(max-width:760px){ #priceChart{height:300px} #mmChart{height:130px} }
+  .legend2{display:flex; flex-wrap:wrap; gap:10px 16px; font-size:11.5px; color:var(--muted); margin-top:10px}
+  .legend2 span{display:inline-flex; align-items:center; gap:5px}
+  .fng-row{display:flex; align-items:center; gap:22px; flex-wrap:wrap}
+  .fng-gauge{flex:none}
+  .fng-info .v{font-size:34px; font-weight:800}
+  .fng-info .k{font-size:12.5px; color:var(--muted)}
+  .note{font-size:12px; color:var(--muted); line-height:1.7; margin-top:10px}
+  .loading{color:var(--muted); font-size:12.5px; text-align:center; padding:40px 0}
+  .section-divider{
+    margin:32px 0; border:none; border-top:1px solid var(--line); position:relative;
+  }
+  .section-jump{display:block; text-align:center; margin-top:-13px}
+  .section-jump a{
+    background:var(--bg); border:1px solid var(--line); color:var(--muted);
+    border-radius:999px; padding:5px 14px; font-size:12px; text-decoration:none;
+  }
+  @media(max-width:900px){ .grid4{grid-template-columns:1fr 1fr} }
+  @media(max-width:520px){ .grid4{grid-template-columns:1fr} .fng-row{justify-content:center; text-align:center} }
+
+  @media(max-width:760px){
+    .hero{grid-template-columns:1fr 1fr; gap:14px}
+    .hero .item.main{grid-column:1/-1}
+    .controls select,.controls button{flex:1; min-width:0}
+    th,td{font-size:12px; padding:9px 7px}
+    th:nth-child(3),td:nth-child(3){display:none}
+  }
+</style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="logo">₿</div>
+
+<header>
+  <div class="brand">
+    <div class="mark">₿</div>
     <div>
-      <h1>BTC 사이클 밸류에이션 대시보드</h1>
-      <div class="subtitle">메이어 배수(Mayer Multiple) · 공포·탐욕지수 · 알트코인 시즌 · BTC 도미넌스</div>
+      <h1>BTC → 알트 상대강도 레이더</h1>
+      <div class="sub">사이클 밸류에이션 · 실시간 상대강도(RS) · 기간별 상대강도 — 아래로 스크롤해서 한 화면에서 확인</div>
     </div>
-    <div class="status" id="status">데이터 불러오는 중…</div>
-  </header>
+  </div>
+  <div class="controls">
+    <select id="exchange" aria-label="거래소">
+      <option value="upbit">UPBIT · KRW</option>
+      <option value="binance">BINANCE · USDT</option>
+    </select>
+    <select id="threshold" aria-label="BTC 이벤트 임계값">
+      <option value=".005">BTC ±0.5%</option>
+      <option value=".01" selected>BTC ±1.0%</option>
+      <option value=".02">BTC ±2.0%</option>
+    </select>
+    <select id="multiple" aria-label="반응 배수 목표">
+      <option value="1.2">목표 1.2×</option>
+      <option value="1.5" selected>목표 1.5×</option>
+      <option value="2">목표 2.0×</option>
+    </select>
+    <select id="window" aria-label="차트 표시 기간">
+      <option value="120">최근 2분</option>
+      <option value="300" selected>최근 5분</option>
+      <option value="900">최근 15분</option>
+      <option value="3600">최근 1시간</option>
+    </select>
+    <button id="reset" type="button">기준점 리셋</button>
+    <button id="sound" type="button">🔕 알림</button>
+    <button id="coinToggle" type="button">⚙ 코인 관리</button>
+  </div>
 
-  <section class="cards">
-    <div class="card">
-      <div class="label">BTC 현재가</div>
-      <div class="value" id="btcPrice">—</div>
+  <div class="coinpanel" id="coinPanel" hidden>
+    <div>
+      <div class="cp-title">추적 중인 코인 <span style="font-weight:500">(BTC는 기준코인이라 고정, × 를 눌러 삭제)</span></div>
+      <div class="chips" id="activeChips"></div>
     </div>
-    <div class="card">
-      <div class="label">메이어 배수 (가격÷200일 평균)</div>
-      <div class="value" id="mayerValue">—</div>
-      <span class="badge" id="mayerBadge">계산 중</span>
+    <div>
+      <div class="cp-title">빠른 추가</div>
+      <div class="chips" id="candidateChips"></div>
     </div>
-    <div class="card">
-      <div class="label">공포·탐욕 지수</div>
-      <div class="value" id="fearValue">—</div>
-      <span class="badge" id="fearBadge">계산 중</span>
+    <div class="cp-add">
+      <input id="customSym" type="text" placeholder="직접 추가 (예: DOGE, PEPE)" maxlength="10">
+      <button id="addCustom" type="button">추가</button>
     </div>
-    <div class="card">
-      <div class="label">BTC 도미넌스</div>
-      <div class="value" id="dominance">—</div>
-    </div>
-  </section>
+    <div class="cp-note">최대 14개까지 추적 가능 · 거래소에 상장되지 않은 심볼은 가격이 뜨지 않을 수 있습니다 · 선택은 이 브라우저에 자동 저장됩니다</div>
+  </div>
+</header>
 
-  <section class="panel">
-    <h2 class="panel-title">BTC 장기 가격 차트 <span style="color:var(--muted);font-weight:500">(메이어 배수 구간 색상)</span></h2>
-    <div class="panel-desc">
-      바이낸스 BTCUSDT 일봉을 기준으로 200일 단순이동평균을 계산합니다.
-      선 색상은 해당 시점의 메이어 배수 구간을 나타냅니다.
-    </div>
-    <div class="chartbox"><canvas id="priceChart"></canvas></div>
-    <div class="legend">
-      <span><i class="dot" style="background:var(--blue)"></i>&lt; 1.0 저평가/과거 사이클 저점권</span>
-      <span><i class="dot" style="background:var(--green)"></i>1.0~1.5 중립</span>
-      <span><i class="dot" style="background:var(--yellow)"></i>1.5~2.4 다소 과열</span>
-      <span><i class="dot" style="background:var(--red)"></i>&gt; 2.4 역사적 과열</span>
-    </div>
-  </section>
+<main>
+  <div id="cycle" style="scroll-margin-top:80px"></div>
+  <div class="grid4" id="statCards">
+    <div class="card"><div class="k">BTC 현재가</div><div class="v mono" id="statPrice">--</div></div>
+    <div class="card"><div class="k">메이어 배수 (가격÷200일 평균)</div><div class="v mono" id="statMM">--</div><span class="tag zone-muted" id="statMMTag">계산 중</span></div>
+    <div class="card"><div class="k">공포·탐욕 지수</div><div class="v mono" id="statFng">--</div><span class="tag zone-muted" id="statFngTag">계산 중</span></div>
+    <div class="card"><div class="k">BTC 도미넌스</div><div class="v mono" id="statDom">--</div></div>
+  </div>
 
-  <section class="panel">
-    <h2 class="panel-title">메이어 배수 추이</h2>
-    <div class="panel-desc">
-      1.0 아래(파란 점선)는 역사적으로 매수 관심 구간, 2.4 위(빨간 점선)는 과열 구간으로 자주 언급됩니다.
-      절대적 기준은 아닙니다.
-    </div>
-    <div class="mayer-wrap"><canvas id="mayerChart"></canvas></div>
-  </section>
-
-  <section class="panel">
-    <h2 class="panel-title">공포·탐욕 지수</h2>
-    <div class="panel-desc">0에 가까울수록 극단적 공포, 100에 가까울수록 극단적 탐욕으로 해석합니다.</div>
-    <div class="fear-grid">
-      <div>
-        <div class="gauge">
-          <div class="gauge-bg"></div>
-          <div class="needle" id="needle"></div>
-        </div>
-        <div class="fear-number" id="fearNumber">—</div>
-        <div class="fear-caption" id="fearCaption">데이터 불러오는 중</div>
+  <section style="margin-top:0">
+    <div class="panel">
+      <div class="phead">
+        <h2>BTC 장기 가격 차트 (메이어 배수 구간 색상)</h2>
+        <select id="rangeSel">
+          <option value="365">최근 1년</option>
+          <option value="1460">최근 4년(반감기 한 사이클)</option>
+          <option value="99999" selected>전체 기간 (2017년~)</option>
+        </select>
       </div>
-      <div class="chartbox small"><canvas id="fearChart"></canvas></div>
+      <p class="pdesc">가격 로그 스케일 · 바이낸스 BTCUSDT 상장(2017년 8월) 이후 전체 일봉 데이터 기준. 선 색깔은 그 날의 "메이어 배수"(현재가 ÷ 200일 이동평균) 구간을 나타냅니다 — MVRV Z-Score 차트를 보는 방식과 동일한 개념입니다. 단, 이건 온체인 실현가치가 아니라 순수 가격 데이터로 계산한 근사 지표입니다.</p>
+      <canvas id="priceChart" class="chart"></canvas>
+      <div class="legend2">
+        <span><i class="sw" style="background:#38bdf8"></i>&lt; 1.0 저평가(과거 사이클 저점권)</span>
+        <span><i class="sw" style="background:#4ade80"></i>1.0~1.5 중립</span>
+        <span><i class="sw" style="background:#facc15"></i>1.5~2.4 다소 과열</span>
+        <span><i class="sw" style="background:#f87171"></i>&gt; 2.4 역사적 과열(과거 사이클 고점권)</span>
+      </div>
     </div>
   </section>
 
-  <section class="panel">
-    <button class="refresh" id="refreshBtn">새로고침</button>
-    <h2 class="panel-title">알트코인 시즌 지수 <span style="color:var(--muted);font-weight:500">(참고용)</span></h2>
-    <div class="panel-desc">
-      상위 50개 코인 가운데 최근 90일간 BTC보다 많이 오른 코인의 비율을 기준으로 한 지수입니다.
-      75 이상이면 일반적으로 ‘알트코인 시즌’, 25 이하이면 ‘비트코인 시즌’으로 분류합니다.
+  <section>
+    <div class="panel">
+      <div class="phead"><h2>메이어 배수 추이</h2></div>
+      <p class="pdesc">1.0 아래(파란 점선)는 역사적으로 매수 관심 구간, 2.4 위(빨간 점선)는 역사적으로 과열 구간으로 언급되어온 임계값입니다. 절대적 기준은 아닙니다.</p>
+      <canvas id="mmChart" class="chart"></canvas>
     </div>
-    <div id="altContent" class="loading">데이터 불러오는 중…</div>
   </section>
 
-  <footer>
-    데이터 출처: Binance 공개 시장 데이터(가격), Alternative.me(공포·탐욕), CoinGecko(BTC 도미넌스),
-    CoinMarketCap 공개 Altcoin Season Index. 각 지표는 서로 다른 산식과 시차를 가질 수 있습니다.
-    <br>
-    메이어 배수는 가격 ÷ 200일 이동평균으로 계산하며, 본 페이지는 투자 조언이 아닌 참고용 시장 대시보드입니다.
-  </footer>
-</div>
+  <section>
+    <div class="panel">
+      <div class="phead"><h2>공포·탐욕 지수</h2></div>
+      <p class="pdesc">0에 가까울수록 극단적 공포(패닉 매도 구간), 100에 가까울수록 극단적 탐욕(과열 구간). 극단값 자체가 종종 단기 반전 신호로 언급됩니다.</p>
+      <div class="fng-row">
+        <div class="fng-gauge"><canvas id="fngGauge" width="220" height="130"></canvas></div>
+        <div class="fng-info">
+          <div class="v" id="fngValue">--</div>
+          <div class="k" id="fngLabel">불러오는 중…</div>
+        </div>
+        <div style="flex:1; min-width:220px">
+          <canvas id="fngChart" class="chart"></canvas>
+          <div class="note" style="margin-top:6px">최근 90일 추이</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <div class="phead"><h2>알트코인 시즌 지수 (참고용)</h2><button id="altRefresh" type="button" class="navlink" style="cursor:pointer">새로고침</button></div>
+      <p class="pdesc">시가총액 상위 50개 코인 중, 최근 90일간 BTC보다 더 많이 오른 코인의 비율입니다. 75 이상이면 통상 "알트시즌", 25 이하면 "비트코인 시즌"으로 분류됩니다.</p>
+      <div id="altBox" class="loading">불러오려면 "새로고침"을 눌러주세요 (무료 API 호출 제한 때문에 자동 실행하지 않습니다)</div>
+    </div>
+  </section>
+
+  <p class="note">
+    사이클 지표 데이터 출처: 가격(메이어 배수 계산용) — 바이낸스 공개 API(무료, 키 불필요, 2017년 8월~) · 시총·도미넌스·알트시즌 — CoinGecko 공개 API(무료, 키 불필요) · 공포탐욕지수 — Alternative.me(무료, 키 불필요).
+    메이어 배수는 실제 온체인 MVRV가 아니라 가격만으로 계산한 근사 지표이며, 모든 지표는 과거 패턴을 보여줄 뿐 미래를 보장하지 않습니다.
+  </p>
+
+  <hr class="section-divider">
+  <div class="section-jump"><a href="#radar">↓ 실시간 상대강도 레이더 보기</a></div>
+
+  <section style="margin-top:0">
+    <div class="chartpanel">
+      <div class="chead">
+        <h3>기간별 BTC 대비 상대강도</h3>
+      </div>
+      <div class="periodbtns" id="periodBtns">
+        <button type="button" class="pbtn" data-days="30">1개월</button>
+        <button type="button" class="pbtn" data-days="90">3개월</button>
+        <button type="button" class="pbtn" data-days="182">6개월</button>
+        <button type="button" class="pbtn active" data-days="365">1년</button>
+        <button type="button" class="pbtn" data-days="730">2년</button>
+        <button type="button" class="pbtn" data-days="1095">3년</button>
+        <button type="button" class="pbtn" data-days="1460">4년</button>
+        <button type="button" class="pbtn" data-days="1825">5년</button>
+        <button type="button" class="pbtn" data-days="2190">6년</button>
+        <button type="button" class="pbtn" data-days="2555">7년</button>
+        <button type="button" class="pbtn" data-days="2920">8년</button>
+        <button type="button" class="pbtn" data-days="3285">9년</button>
+        <button type="button" class="pbtn" data-days="3650">10년</button>
+      </div>
+      <div class="cp-add" style="margin-top:10px; align-items:center">
+        <input id="customDays" type="number" min="1" max="7300" placeholder="직접 입력 (숫자)">
+        <select id="customUnit" style="flex:none">
+          <option value="1">일</option>
+          <option value="30">개월</option>
+          <option value="365" selected>년</option>
+        </select>
+        <button id="applyCustomDays" type="button">적용</button>
+      </div>
+      <p class="chart-desc" style="margin-top:10px">선택 기간 동안 (알트 수익률 − BTC 수익률). 오른쪽(민트)일수록 BTC보다 더 잘 오른 코인, 왼쪽(코랄)일수록 BTC보다 못한 코인입니다. 10%p 단위로 색이 진해집니다. 최근 상장된 코인은 상장 이후 전체 기간으로 계산됩니다.</p>
+      <div id="relBars"><div class="empty">과거 일봉 데이터를 불러오는 중…</div></div>
+    </div>
+  </section>
+
+  <hr class="section-divider">
+  <div class="section-jump"><a href="#cycle">↑ 사이클 지표 보기</a></div>
+
+  <div class="hero" id="radar" style="margin-top:28px; scroll-margin-top:20px">
+    <div class="item main">
+      <div class="k">BTC 기준점 대비 변화</div>
+      <div id="btc" class="v mono">--</div>
+      <div class="pillrow"><span id="dot" class="dot"></span><span id="conn" class="muted" style="font-size:12px">연결 대기</span></div>
+    </div>
+    <div class="item"><div class="k">시장 상태</div><div id="state" class="v">대기</div></div>
+    <div class="item"><div class="k">목표 배수 달성</div><div id="breadth" class="v mono">--</div></div>
+    <div class="item"><div class="k">기준점 설정</div><div id="basetime" class="v" style="font-size:14px; font-weight:600; color:var(--muted)">--</div></div>
+  </div>
+
+  <div class="event">
+    <div class="tag" id="eventTag">⏳</div>
+    <div>
+      <b id="eventTitle">BTC 이벤트 대기 중</b>
+      <div class="desc" id="eventText">BTC가 설정한 임계값에 도달하면 그 순간 알트코인 반응을 기록합니다.</div>
+    </div>
+  </div>
+
+  <section>
+    <div class="chartpanel">
+      <div class="chead">
+        <h3>BTC 대비 상대강도(RS) 추이</h3>
+        <div class="legend" id="legend"></div>
+      </div>
+      <p class="chart-desc">각 알트코인 수익률 − BTC 수익률. 0보다 위면 BTC보다 더 잘 오르는(더 잘 버티는) 코인입니다.</p>
+      <canvas id="chartRel" class="chart"></canvas>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>코인별 상대강도</h2><span class="hint">기준점 대비 변화율 · 막대는 BTC 대비 상대강도(RS) 크기</span></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>코인</th><th>현재 변화</th><th>BTC 대비(RS)</th><th>목표 상승</th><th>목표 하락</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>이벤트 기록</h2><span class="hint">최근 10건</span></div>
+    <div class="tablewrap"><div id="log"><div class="empty">아직 이벤트가 없습니다.</div></div></div>
+  </section>
+
+  <footer>주문·매매 기능 없음 · 시세는 각 거래소 공개 WebSocket에서 직접 수신 · 투자 참고용이며 투자 조언이 아닙니다</footer>
+</main>
 
 <script>
+const DEFAULT_COINS = ["BTC","ETH","XRP","SOL","ADA","HBAR","AAVE","LINK","ONDO","TAO"];
+const CANDIDATES = ["DOGE","DOT","AVAX","POL","UNI","ICP","FIL","WLD","ATOM","NEAR","SUI","ARB","OP","INJ","TRX","LTC","BCH","ETC","XLM","SEI"];
+const MAX_COINS = 14;
+const BTC_COLOR = "#f5a623";
+
+function loadSavedCoins(){
+  try{
+    const raw = localStorage.getItem("btcRadarCoins");
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr) && arr[0] === "BTC" && arr.length >= 2) return arr;
+    }
+  }catch(e){}
+  return null;
+}
+function saveCoins(){ try{ localStorage.setItem("btcRadarCoins", JSON.stringify(COINS)); }catch(e){} }
+
+let COINS = loadSavedCoins() || DEFAULT_COINS.slice();
+let series = {}; COINS.forEach(c => series[c] = []); // {t, ret} 시계열(기준점 대비 %, 소수)
+
+let p = {}, base = {}, baseTime = null, events = [], lastDir = 0, lock = 0, soundOn = false, ws;
 const $ = id => document.getElementById(id);
-const charts = {};
+const pct = (a,b) => (b ? a/b - 1 : 0);
+const fmt = x => (x>=0?"+":"") + (x*100).toFixed(2) + "%";
+const haveAll = () => COINS.every(c => p[c] !== undefined);
+const altCoins = () => COINS.filter(c => c !== "BTC");
+function colorFor(sym){
+  if(sym === "BTC") return BTC_COLOR;
+  const alts = altCoins();
+  const idx = Math.max(0, alts.indexOf(sym));
+  const n = Math.max(alts.length, 1);
+  return `hsl(${Math.round((idx / n) * 360)}, 72%, 58%)`;
+}
 
-const COLORS = {
-  blue: '#37b8ff',
-  green: '#40dc88',
-  yellow: '#f4cf38',
-  red: '#ff6871',
-  purple: '#a987ff',
-  grid: 'rgba(122,142,178,.14)',
-  text: '#8996ae'
+function reset(){
+  if(!haveAll()) return;
+  base = {...p}; baseTime = new Date(); events = []; lastDir = 0; lock = 0;
+  COINS.forEach(c => series[c] = []);
+  render();
+  $("basetime").textContent = baseTime.toLocaleTimeString();
+  $("log").innerHTML = '<div class="empty">아직 이벤트가 없습니다.</div>';
+}
+
+function renderLegend(){
+  $("legend").innerHTML = altCoins().map(c => `<span><i class="sw" style="background:${colorFor(c)}"></i>${c}</span>`).join("");
+}
+function renderCoinPanel(){
+  $("activeChips").innerHTML = COINS.map(c => {
+    if(c === "BTC") return `<span class="chip locked"><i class="sw" style="background:${BTC_COLOR}"></i>BTC</span>`;
+    return `<span class="chip"><i class="sw" style="background:${colorFor(c)}"></i>${c}<button class="chip-x" data-sym="${c}" type="button" aria-label="${c} 삭제">×</button></span>`;
+  }).join("");
+  const remaining = CANDIDATES.filter(c => !COINS.includes(c));
+  $("candidateChips").innerHTML = remaining.length
+    ? remaining.map(c => `<button class="chip add" data-sym="${c}" type="button">+ ${c}</button>`).join("")
+    : '<span class="muted" style="font-size:12px">추천 목록의 코인을 모두 추가했습니다</span>';
+}
+function afterCoinsChange(){
+  saveCoins();
+  COINS.forEach(c => { if(!series[c]) series[c] = []; });
+  Object.keys(series).forEach(c => { if(!COINS.includes(c)) delete series[c]; });
+  renderLegend();
+  renderCoinPanel();
+  connect();
+  loadHistoryFor(COINS);
+}
+function addCoin(raw){
+  const sym = (raw||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if(!sym) return;
+  if(COINS.includes(sym)) return;
+  if(COINS.length >= MAX_COINS){ alert(`코인은 최대 ${MAX_COINS}개까지 추적할 수 있어요.`); return; }
+  COINS.push(sym);
+  afterCoinsChange();
+}
+function removeCoin(sym){
+  if(sym === "BTC") return;
+  COINS = COINS.filter(c => c !== sym);
+  afterCoinsChange();
+}
+
+$("reset").onclick = reset;
+$("sound").onclick = () => {
+  soundOn = !soundOn;
+  $("sound").textContent = soundOn ? "🔔 알림 켜짐" : "🔕 알림";
+  $("sound").classList.toggle("on", soundOn);
 };
+$("coinToggle").onclick = () => {
+  const panel = $("coinPanel");
+  panel.hidden = !panel.hidden;
+  $("coinToggle").classList.toggle("on", !panel.hidden);
+};
+$("activeChips").addEventListener("click", e => {
+  const btn = e.target.closest(".chip-x");
+  if(btn) removeCoin(btn.dataset.sym);
+});
+$("candidateChips").addEventListener("click", e => {
+  const btn = e.target.closest(".chip.add");
+  if(btn) addCoin(btn.dataset.sym);
+});
+$("addCustom").onclick = () => { addCoin($("customSym").value); $("customSym").value = ""; };
+$("customSym").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $("addCustom").click(); } });
 
-function fmtUSD(n){
-  if(!Number.isFinite(n)) return '—';
-  return '$' + Math.round(n).toLocaleString('en-US');
+function beep(){
+  if(!soundOn) return;
+  try{
+    const a = new (window.AudioContext||window.webkitAudioContext)();
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = "sine"; o.frequency.value = 880;
+    o.connect(g); g.connect(a.destination);
+    g.gain.setValueAtTime(.001, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(.2, a.currentTime+.01);
+    g.gain.exponentialRampToValueAtTime(.001, a.currentTime+.35);
+    o.start(); o.stop(a.currentTime + .35);
+  }catch(e){}
 }
-function fmtDate(ts){
-  const d = new Date(ts);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+
+function record(c){
+  if(!base[c] || p[c] === undefined) return;
+  const t = Date.now();
+  if(!series[c]) series[c] = [];
+  series[c].push({ t, ret: pct(p[c], base[c]) });
+  const maxMs = +$("window").value * 1000;
+  const cutoff = t - maxMs;
+  let arr = series[c];
+  let i = 0; while(i < arr.length && arr[i].t < cutoff) i++;
+  if(i > 0) series[c] = arr.slice(i);
 }
-function classifyMayer(v){
-  if(v < 1) return ['저평가', 'blue'];
-  if(v < 1.5) return ['중립', 'green'];
-  if(v < 2.4) return ['다소 과열', 'yellow'];
-  return ['역사적 과열', 'red'];
+
+function detect(){
+  if(!base.BTC) return;
+  const b = pct(p.BTC, base.BTC), t = +$("threshold").value;
+  const d = b >= t ? 1 : b <= -t ? -1 : 0;
+  if(d && d !== lastDir && Date.now() > lock){
+    const vals = {};
+    altCoins().forEach(c => vals[c] = pct(p[c], base[c]));
+    events.unshift({ time: new Date(), b, vals });
+    events = events.slice(0, 10);
+    lock = Date.now() + 15000;
+    beep();
+    $("eventTag").textContent = d > 0 ? "🚀" : "⚠️";
+    $("eventTitle").textContent = d > 0 ? "BTC 상승 이벤트 발생" : "BTC 하락 이벤트 발생";
+    $("eventText").textContent = `BTC ${fmt(b)} (기준점 대비) · 같은 시점 알트코인 반응을 기록했습니다.`;
+  }
+  lastDir = d;
 }
-function classifyFear(v){
-  if(v <= 24) return ['극단적 공포','blue'];
-  if(v <= 44) return ['공포','blue'];
-  if(v <= 54) return ['중립','green'];
-  if(v <= 74) return ['탐욕','yellow'];
-  return ['극단적 탐욕','red'];
+
+function render(){
+  if(!base.BTC) return;
+  const b = pct(p.BTC, base.BTC), t = +$("threshold").value, mult = +$("multiple").value;
+  let strong = 0, rowsHtml = "";
+
+  $("btc").textContent = fmt(b);
+  $("btc").className = "v mono " + (b >= 0 ? "pos" : "neg");
+  $("state").textContent = b >= t ? "🚀 강한 상승" : b <= -t ? "⚠️ 약세" : "관망";
+  $("state").className = "v " + (b >= t ? "pos" : b <= -t ? "neg" : "muted");
+
+  altCoins().forEach(c => {
+    const r = pct(p[c], base[c]);
+    const rel = r - b;
+    const up = b >= t && r >= mult * b;
+    const down = b <= -t && r <= mult * b;
+    if(b !== 0 && Math.abs(b) >= t && (r/b) >= mult) strong++;
+    const barWidth = Math.min(100, Math.abs(rel) / 0.03 * 100);
+    const barColor = rel >= 0 ? "var(--teal)" : "var(--coral)";
+    const barSide = rel >= 0 ? "left:50%;" : `right:50%;`;
+    rowsHtml += `<tr>
+      <td class="coin"><i class="dot-sw" style="background:${colorFor(c)}"></i>${c}</td>
+      <td class="mono ${r>=0?"pos":"neg"}">${fmt(r)}</td>
+      <td class="mono ${rel>=0?"pos":"neg"}">
+        ${fmt(rel)}
+        <div class="bar"><i style="${barSide} width:${barWidth/2}%; background:${barColor}"></i></div>
+      </td>
+      <td><span class="badge ${up?"hit":"no"}">${up?"달성":"-"}</span></td>
+      <td><span class="badge ${down?"hit":"no"}">${down?"달성":"-"}</span></td>
+    </tr>`;
+  });
+
+  $("rows").innerHTML = rowsHtml;
+  $("breadth").textContent = strong + " / " + altCoins().length;
+  $("log").innerHTML = events.length
+    ? events.map(e => `<div class="row">
+        <b>${e.time.toLocaleTimeString()}</b> — BTC <span class="mono ${e.b>=0?"pos":"neg"}">${fmt(e.b)}</span>
+        <div class="muted mono" style="margin-top:4px">${Object.entries(e.vals).map(([c,v])=>c+" "+fmt(v)).join("  ·  ")}</div>
+      </div>`).join("")
+    : '<div class="empty">아직 이벤트가 없습니다.</div>';
 }
-function badge(el, text, cls){
-  el.textContent = text;
-  el.className = 'badge ' + cls;
+
+function setConn(text, live){
+  $("conn").textContent = text;
+  $("dot").className = "dot" + (live ? " live" : "");
 }
-function baseChartOptions(yTitle=''){
-  return {
-    responsive:true, maintainAspectRatio:false,
-    interaction:{mode:'index',intersect:false},
-    plugins:{
-      legend:{display:false},
-      tooltip:{backgroundColor:'#0a1120',borderColor:'#2a3854',borderWidth:1,titleColor:'#fff',bodyColor:'#d9e2f5'}
-    },
-    scales:{
-      x:{grid:{color:COLORS.grid},ticks:{color:COLORS.text,maxTicksLimit:10,font:{size:9}}},
-      y:{grid:{color:COLORS.grid},ticks:{color:COLORS.text,font:{size:9}},title:{display:!!yTitle,text:yTitle,color:COLORS.text}}
-    }
+
+function connect(){
+  if(ws){ try{ ws.close(); }catch(e){} }
+  p = {}; base = {}; baseTime = null;
+  $("basetime").textContent = "--";
+  setConn("연결 중…", false);
+
+  if($("exchange").value === "upbit"){
+    ws = new WebSocket("wss://api.upbit.com/websocket/v1");
+    ws.onopen = () => {
+      setConn("UPBIT 연결됨", true);
+      ws.send(JSON.stringify([
+        {ticket:"radar"},
+        {type:"ticker", codes: COINS.map(c => "KRW-"+c), isOnlyRealtime:true},
+        {format:"SIMPLE"}
+      ]));
+    };
+    ws.onmessage = async (e) => {
+      const raw = e.data instanceof Blob ? await e.data.text() : e.data;
+      const d = JSON.parse(raw);
+      const code = d.cd || d.code, c = code && code.split("-")[1], v = d.tp ?? d.trade_price;
+      if(c && v && COINS.includes(c)) p[c] = +v;
+      if(!base.BTC && haveAll()) reset();
+      if(base.BTC && c) record(c);
+      detect(); render();
+    };
+  } else {
+    const streams = COINS.map(c => c.toLowerCase() + "usdt@ticker").join("/");
+    ws = new WebSocket("wss://stream.binance.com:9443/stream?streams=" + streams);
+    ws.onopen = () => setConn("BINANCE 연결됨", true);
+    ws.onmessage = (e) => {
+      const d = JSON.parse(e.data).data;
+      const c = COINS.find(q => q.toLowerCase() + "usdt" === d.s.toLowerCase());
+      if(c) p[c] = +d.c;
+      if(!base.BTC && haveAll()) reset();
+      if(base.BTC && c) record(c);
+      detect(); render();
+    };
+  }
+  ws.onerror = () => setConn("오류 · 재연결 대기", false);
+  ws.onclose = () => { setConn("재연결 중…", false); setTimeout(connect, 2500); };
+}
+
+function drawRelChart(){
+  const cv = $("chartRel");
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if(w === 0 || h === 0) return;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const windowMs = +$("window").value * 1000;
+  const now = Date.now();
+  const fromT = now - windowMs;
+
+  const btcSeries = series.BTC || [];
+  const btcAt = (t) => {
+    if(!btcSeries.length) return 0;
+    let last = btcSeries[0].ret;
+    for(const pt of btcSeries){ if(pt.t > t) break; last = pt.ret; }
+    return last;
   };
+
+  const plotted = altCoins().map(c => {
+    const raw = (series[c]||[]).filter(pt => pt.t >= fromT);
+    return { c, pts: raw.map(pt => ({ t: pt.t, ret: pt.ret - btcAt(pt.t) })) };
+  });
+
+  let vals = [];
+  plotted.forEach(s => s.pts.forEach(pt => vals.push(pt.ret*100)));
+  let min = vals.length ? Math.min(-0.3, ...vals) : -1;
+  let max = vals.length ? Math.max(0.3, ...vals) : 1;
+  const pad = (max-min)*0.14 || 0.2; min -= pad; max += pad;
+
+  const L=48, R=12, T=10, B=8, pw=w-L-R, ph=h-T-B;
+  if(pw<=0 || ph<=0) return;
+
+  ctx.strokeStyle = "#232c42"; ctx.lineWidth = 1; ctx.font = "10.5px ui-monospace,Menlo,monospace";
+  for(let i=0;i<=4;i++){
+    const y = T + ph*i/4;
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke();
+    const v = max - (max-min)*i/4;
+    ctx.fillStyle = "#7c8aa5"; ctx.fillText(v.toFixed(2)+"%", 4, y+3.5);
+  }
+  if(max > 0 && min < 0){
+    const yz = T + ph*(max/(max-min));
+    ctx.strokeStyle = "#3a4864"; ctx.beginPath(); ctx.moveTo(L,yz); ctx.lineTo(w-R,yz); ctx.stroke();
+  }
+
+  plotted.forEach((s) => {
+    if(s.pts.length < 2) return;
+    ctx.strokeStyle = colorFor(s.c);
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    s.pts.forEach((pt, j) => {
+      const x = L + ((pt.t - fromT) / windowMs) * pw;
+      const y = T + (max - pt.ret*100) / (max-min) * ph;
+      if(j===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  });
+
+  if(!vals.length){
+    ctx.fillStyle = "#7c8aa5"; ctx.font = "12px -apple-system,sans-serif";
+    ctx.fillText("데이터 수집 중…", L+8, T+ph/2);
+  }
 }
 
-async function fetchJSON(url, options={}){
-  const r = await fetch(url, {cache:'no-store', ...options});
-  if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-  return r.json();
-}
+setInterval(drawRelChart, 500);
+window.addEventListener("resize", drawRelChart);
 
-// Binance: daily BTCUSDT candles. 1000 rows/request; enough calls for 2017~present.
-async function fetchBTC(daysBack=3400){
-  const end = Date.now();
-  const start = end - daysBack*86400000;
+/* ---- 기간별(1개월~10년) BTC 대비 상대강도 바 차트 ---- */
+let histCache = {}; // symbol -> [{t, price}, ...] 오름차순, 바이낸스 일봉
+let relPeriodDays = 365;
+
+async function fetchCoinHistory(symbol){
+  const start = Date.UTC(2017, 0, 1);
   let cursor = start;
-  const all = [];
-  while(cursor < end){
-    const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${cursor}&endTime=${end}&limit=1000`;
-    const rows = await fetchJSON(url);
-    if(!rows.length) break;
-    for(const r of rows) all.push({t:r[0], close:Number(r[4])});
-    const next = rows[rows.length-1][0] + 86400000;
-    if(next <= cursor) break;
-    cursor = next;
+  const now = Date.now();
+  let klines = [];
+  for(let guard=0; guard<20 && cursor < now; guard++){
+    const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}USDT&interval=1d&startTime=${cursor}&limit=1000`;
+    let rows;
+    try{
+      const res = await fetch(url);
+      if(!res.ok) break;
+      rows = await res.json();
+    }catch(e){ break; }
+    if(!Array.isArray(rows) || !rows.length) break;
+    klines = klines.concat(rows);
+    const lastOpen = rows[rows.length-1][0];
     if(rows.length < 1000) break;
+    cursor = lastOpen + 86400000;
   }
-  const seen = new Map();
-  all.forEach(x => seen.set(x.t,x));
-  return [...seen.values()].sort((a,b)=>a.t-b.t);
+  return klines.map(k => ({ t: k[0], price: parseFloat(k[4]) }));
 }
 
-function withMayer(rows){
-  const out = [];
+async function loadHistoryFor(symbols){
+  const missing = symbols.filter(s => !histCache[s]);
+  if(!missing.length){ renderRelBars(); computeMayerFromHistCache(); updateStatCards(); drawCycleAll(); return; }
+  $("relBars").innerHTML = '<div class="empty">과거 일봉 데이터를 불러오는 중…</div>';
+  await Promise.all(missing.map(async s => {
+    try{ histCache[s] = await fetchCoinHistory(s); }
+    catch(e){ histCache[s] = []; }
+  }));
+  Object.keys(histCache).forEach(s => { if(!COINS.includes(s)) delete histCache[s]; });
+  renderRelBars();
+  computeMayerFromHistCache();
+  updateStatCards();
+  drawCycleAll();
+}
+
+/* ---- 사이클 밸류에이션 대시보드 (메이어 배수 · 공포탐욕지수 · 도미넌스 · 알트시즌) ---- */
+const fmtUsd = n => "$" + n.toLocaleString(undefined,{maximumFractionDigits:0});
+let dailyPrices = []; // {t, price, ma200, mm} - histCache.BTC 기반 파생
+let fngData = [];     // {t, value}
+
+function zoneOf(mm){
+  if(mm < 1.0) return {name:"저평가", cls:"zone-blue", color:"#38bdf8"};
+  if(mm < 1.5) return {name:"중립", cls:"zone-green", color:"#4ade80"};
+  if(mm < 2.4) return {name:"다소 과열", cls:"zone-yellow", color:"#facc15"};
+  return {name:"역사적 과열", cls:"zone-red", color:"#f87171"};
+}
+function fngZone(v){
+  if(v <= 24) return {name:"극단적 공포", cls:"zone-blue"};
+  if(v <= 44) return {name:"공포", cls:"zone-green"};
+  if(v <= 55) return {name:"중립", cls:"zone-green"};
+  if(v <= 74) return {name:"탐욕", cls:"zone-yellow"};
+  return {name:"극단적 탐욕", cls:"zone-red"};
+}
+
+function computeMayerFromHistCache(){
+  const btcHist = histCache.BTC;
+  if(!btcHist || !btcHist.length) return;
   let sum = 0;
-  const q = [];
-  for(const r of rows){
-    q.push(r.close); sum += r.close;
-    if(q.length > 200) sum -= q.shift();
-    const ma = q.length === 200 ? sum/200 : null;
-    out.push({...r, ma, mayer:ma ? r.close/ma : null});
+  const out = [];
+  for(let i=0;i<btcHist.length;i++){
+    sum += btcHist[i].price;
+    if(i >= 200) sum -= btcHist[i-200].price;
+    if(i >= 199){
+      const ma = sum / 200;
+      out.push({ t: btcHist[i].t, price: btcHist[i].price, ma200: ma, mm: btcHist[i].price / ma });
+    }
   }
-  return out.filter(x => x.ma !== null);
+  dailyPrices = out;
 }
 
-function renderPriceChart(rows){
-  const ctx = $('priceChart').getContext('2d');
-  if(charts.price) charts.price.destroy();
-  charts.price = new Chart(ctx,{
-    type:'line',
-    data:{datasets:[{
-      label:'BTC',
-      data:rows.map(r=>({x:r.t,y:r.close,mayer:r.mayer})),
-      borderWidth:1.8,pointRadius:0,tension:.12,
-      segment:{borderColor:ctx2=>{
-        const m = ctx2.p0.parsed.y && ctx2.p0.raw?.mayer;
-        if(!Number.isFinite(m)) return COLORS.blue;
-        if(m<1) return COLORS.blue;
-        if(m<1.5) return COLORS.green;
-        if(m<2.4) return COLORS.yellow;
-        return COLORS.red;
-      }},
-      parsing:false
-    }]},
-    options:{
-      ...baseChartOptions(),
-      scales:{
-        x:{type:'time',time:{unit:'year',displayFormats:{year:'yyyy'}},grid:{color:COLORS.grid},ticks:{color:COLORS.text,maxTicksLimit:10}},
-        y:{type:'logarithmic',grid:{color:COLORS.grid},ticks:{color:COLORS.text,callback:v=>'$'+Number(v).toLocaleString()}}
-      }
-    }
-  });
-}
-
-// Chart.js time scale without a date adapter: use numeric x and custom ticks.
-function renderPriceChartFallback(rows){
-  const ctx = $('priceChart').getContext('2d');
-  if(charts.price) charts.price.destroy();
-  const labels = rows.map(r=>fmtDate(r.t));
-  charts.price = new Chart(ctx,{
-    type:'line',
-    data:{labels,datasets:[{
-      data:rows.map(r=>r.close),borderWidth:1.8,pointRadius:0,tension:.12,
-      segment:{borderColor:ctx2=>{
-        const i=ctx2.p0DataIndex, m=rows[i]?.mayer;
-        if(!Number.isFinite(m)) return COLORS.blue;
-        if(m<1)return COLORS.blue;if(m<1.5)return COLORS.green;if(m<2.4)return COLORS.yellow;return COLORS.red;
-      }}
-    }]},
-    options:{
-      ...baseChartOptions(),
-      scales:{
-        x:{grid:{color:COLORS.grid},ticks:{color:COLORS.text,maxTicksLimit:10,callback:(v)=>labels[v]?.slice(0,4)}},
-        y:{type:'logarithmic',grid:{color:COLORS.grid},ticks:{color:COLORS.text,callback:v=>'$'+Number(v).toLocaleString()}}
-      }
-    }
-  });
-}
-
-function renderMayerChart(rows){
-  const labels=rows.map(r=>fmtDate(r.t));
-  const ctx=$('mayerChart').getContext('2d');
-  if(charts.mayer) charts.mayer.destroy();
-  charts.mayer = new Chart(ctx,{
-    type:'line',
-    data:{labels,datasets:[
-      {data:rows.map(r=>r.mayer),borderColor:COLORS.purple,borderWidth:1.6,pointRadius:0,tension:.08},
-      {data:labels.map(()=>1),borderColor:'rgba(55,184,255,.75)',borderDash:[5,5],borderWidth:1,pointRadius:0},
-      {data:labels.map(()=>2.4),borderColor:'rgba(255,104,113,.75)',borderDash:[5,5],borderWidth:1,pointRadius:0}
-    ]},
-    options:{
-      ...baseChartOptions(),
-      scales:{
-        x:{grid:{color:COLORS.grid},ticks:{color:COLORS.text,maxTicksLimit:10}},
-        y:{min:0,max:3.2,grid:{color:COLORS.grid},ticks:{color:COLORS.text,font:{size:9}}}
-      }
-    }
-  });
-}
-
-async function loadFear(){
-  const data = await fetchJSON('https://api.alternative.me/fng/?limit=90&format=json&date_format=kr');
-  const arr = data.data.slice().reverse().map(x=>({date:x.timestamp,value:Number(x.value),label:x.value_classification}));
-  const cur=arr[arr.length-1];
-  $('fearValue').textContent=cur.value;
-  $('fearNumber').textContent=cur.value;
-  $('fearCaption').textContent=cur.label;
-  const [txt,cls]=classifyFear(cur.value);
-  badge($('fearBadge'),txt,cls);
-  const angle = -90 + (cur.value/100)*180;
-  $('needle').style.transform=`rotate(${angle}deg)`;
-  const ctx=$('fearChart').getContext('2d');
-  if(charts.fear) charts.fear.destroy();
-  charts.fear=new Chart(ctx,{
-    type:'line',
-    data:{labels:arr.map(x=>x.date),datasets:[{
-      data:arr.map(x=>x.value),borderColor:'#f4cf38',borderWidth:1.6,pointRadius:0,tension:.18
-    }]},
-    options:{...baseChartOptions(),scales:{x:{grid:{color:COLORS.grid},ticks:{color:COLORS.text,maxTicksLimit:7,font:{size:9}}},
-      y:{min:0,max:100,grid:{color:COLORS.grid},ticks:{color:COLORS.text,font:{size:9}}}}}
-  });
+async function loadFng(){
+  try{
+    const res = await fetch("https://api.alternative.me/fng/?limit=0&format=json");
+    if(!res.ok) throw new Error("fng fetch failed: " + res.status);
+    const json = await res.json();
+    fngData = json.data.map(d => ({ t: +d.timestamp*1000, value: +d.value })).reverse();
+    updateStatCards();
+    drawCycleAll();
+  }catch(e){ console.error(e); }
 }
 
 async function loadDominance(){
-  const d=await fetchJSON('https://api.coingecko.com/api/v3/global');
-  const btc=Number(d?.data?.market_cap_percentage?.btc);
-  $('dominance').textContent=Number.isFinite(btc)?btc.toFixed(1)+'%':'—';
+  try{
+    const res = await fetch("https://api.coingecko.com/api/v3/global");
+    const json = await res.json();
+    const dom = json.data.market_cap_percentage.btc;
+    $("statDom").textContent = dom.toFixed(1) + "%";
+  }catch(e){ $("statDom").textContent = "오류"; }
 }
 
-async function loadAltSeason(){
-  // CoinMarketCap documents this as a keyless public endpoint.
-  const d=await fetchJSON('https://pro-api.coinmarketcap.com/public-api/v1/altcoin-season-index/latest');
-  const x=d?.data?.altcoin_index;
-  if(!Number.isFinite(Number(x))) throw new Error('Altcoin index unavailable');
-  const n=Number(x);
-  const label=n>=75?'알트코인 시즌':n<=25?'비트코인 시즌':'중립/전환';
-  const cls=n>=75?'green':n<=25?'blue':'yellow';
-  $('altContent').innerHTML=`
-    <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
-      <div style="font-size:46px;font-weight:900;line-height:1">${n}</div>
-      <div>
-        <span class="badge ${cls}" style="margin-top:0">${label}</span>
-        <div style="margin-top:9px;color:var(--muted);font-size:11px">
-          0 = 비트코인 시즌 · 25 이하 BTC 시즌 · 75 이상 알트 시즌 · 100 = 극단적 알트 우위
-        </div>
-      </div>
-    </div>`;
+function updateStatCards(){
+  if(dailyPrices.length){
+    const last = dailyPrices[dailyPrices.length-1];
+    $("statPrice").textContent = fmtUsd(last.price);
+    $("statMM").textContent = last.mm.toFixed(2) + "×";
+    const z = zoneOf(last.mm);
+    const mmTag = $("statMMTag"); mmTag.textContent = z.name; mmTag.className = "tag " + z.cls;
+  }
+  if(fngData.length){
+    const f = fngData[fngData.length-1];
+    $("statFng").textContent = f.value;
+    const fz = fngZone(f.value);
+    const fngTag = $("statFngTag"); fngTag.textContent = fz.name; fngTag.className = "tag " + fz.cls;
+    $("fngValue").textContent = f.value;
+    $("fngLabel").textContent = fz.name + " · " + new Date(f.t).toLocaleDateString();
+  }
 }
 
-async function loadBTC(){
-  const rows=withMayer(await fetchBTC());
-  if(!rows.length) throw new Error('BTC data unavailable');
-  const latest=rows[rows.length-1];
-  $('btcPrice').textContent=fmtUSD(latest.close);
-  const [txt,cls]=classifyMayer(latest.mayer);
-  $('mayerValue').textContent=latest.mayer.toFixed(2)+'×';
-  badge($('mayerBadge'),txt,cls);
-  renderPriceChartFallback(rows);
-  renderMayerChart(rows);
-  return latest;
+function drawPriceChart(){
+  const cv = $("priceChart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if(w===0||h===0||!dailyPrices.length) return;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const days = +$("rangeSel").value;
+  const cutoff = Date.now() - days*86400000;
+  const data = dailyPrices.filter(d => d.t >= cutoff);
+  if(data.length < 2) return;
+
+  const L=64, R=14, T=14, B=26, pw=w-L-R, ph=h-T-B;
+  const prices = data.map(d=>d.price);
+  const logMin = Math.log10(Math.min(...prices)*0.9);
+  const logMax = Math.log10(Math.max(...prices)*1.1);
+  const t0 = data[0].t, t1 = data[data.length-1].t;
+
+  const xOf = t => L + (t-t0)/(t1-t0)*pw;
+  const yOf = price => T + (logMax - Math.log10(price))/(logMax-logMin)*ph;
+
+  ctx.strokeStyle="#232c42"; ctx.lineWidth=1; ctx.font="10.5px ui-monospace,Menlo,monospace";
+  const gridVals = [];
+  for(let e=Math.floor(logMin); e<=Math.ceil(logMax); e++){
+    [1,2,5].forEach(m=>{ const v=m*Math.pow(10,e); if(v>=Math.pow(10,logMin)&&v<=Math.pow(10,logMax)) gridVals.push(v); });
+  }
+  gridVals.forEach(v=>{
+    const y=yOf(v);
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke();
+    ctx.fillStyle="#7c8aa5";
+    const label = v>=1000 ? "$"+Math.round(v/1000)+"k" : "$"+Math.round(v);
+    ctx.fillText(label, 4, y+3.5);
+  });
+
+  const y0=new Date(t0).getFullYear(), y1=new Date(t1).getFullYear();
+  ctx.textAlign="center";
+  for(let y=y0;y<=y1;y++){
+    const t=new Date(y,0,1).getTime();
+    if(t<t0||t>t1) continue;
+    const x=xOf(t);
+    ctx.strokeStyle="#1a2440"; ctx.beginPath(); ctx.moveTo(x,T); ctx.lineTo(x,h-B); ctx.stroke();
+    ctx.fillStyle="#7c8aa5"; ctx.fillText(String(y), x, h-8);
+  }
+  ctx.textAlign="left";
+
+  for(let i=1;i<data.length;i++){
+    const a=data[i-1], b=data[i];
+    ctx.strokeStyle = zoneOf(b.mm).color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(xOf(a.t), yOf(a.price));
+    ctx.lineTo(xOf(b.t), yOf(b.price));
+    ctx.stroke();
+  }
 }
 
-async function loadAll(){
-  $('status').textContent='업데이트 중…';
-  const jobs=[
-    loadBTC().catch(e=>{console.error(e);return null}),
-    loadFear().catch(e=>{console.error(e);$('fearCaption').textContent='불러오기 실패';$('fearBadge').textContent='오류'}),
-    loadDominance().catch(e=>{console.error(e);$('dominance').textContent='—'}),
-    loadAltSeason().catch(e=>{console.error(e);$('altContent').innerHTML='<div class="error">알트코인 시즌 지수를 불러오지 못했습니다. 새로고침으로 다시 시도해 주세요.</div>'})
+function drawMMChart(){
+  const cv = $("mmChart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if(w===0||h===0||!dailyPrices.length) return;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const days = +$("rangeSel").value;
+  const cutoff = Date.now() - days*86400000;
+  const data = dailyPrices.filter(d => d.t >= cutoff);
+  if(data.length < 2) return;
+
+  const L=36, R=14, T=10, B=8, pw=w-L-R, ph=h-T-B;
+  const mmVals = data.map(d=>d.mm);
+  const max = Math.max(3, ...mmVals) * 1.05;
+  const min = 0;
+  const t0=data[0].t, t1=data[data.length-1].t;
+  const xOf = t => L + (t-t0)/(t1-t0)*pw;
+  const yOf = v => T + (max-v)/(max-min)*ph;
+
+  ctx.strokeStyle="#232c42"; ctx.lineWidth=1; ctx.font="10px ui-monospace,Menlo,monospace";
+  [0,1,2,3].forEach(v=>{
+    if(v>max) return;
+    const y=yOf(v);
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke();
+    ctx.fillStyle="#7c8aa5"; ctx.fillText(v+"×", 2, y+3);
+  });
+
+  ctx.setLineDash([4,4]);
+  ctx.strokeStyle="#38bdf8"; ctx.beginPath(); ctx.moveTo(L,yOf(1)); ctx.lineTo(w-R,yOf(1)); ctx.stroke();
+  ctx.strokeStyle="#f87171"; ctx.beginPath(); ctx.moveTo(L,yOf(2.4)); ctx.lineTo(w-R,yOf(2.4)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle="#a78bfa"; ctx.lineWidth=1.6; ctx.beginPath();
+  data.forEach((d,i)=>{ const x=xOf(d.t), y=yOf(d.mm); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+}
+
+function drawFngGauge(){
+  const cv = $("fngGauge");
+  const ctx = cv.getContext("2d");
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0,0,w,h);
+  const cx=w/2, cy=h-10, r=90;
+  const zones = [
+    {from:0, to:25, color:"#38bdf8"},
+    {from:25, to:45, color:"#4ade80"},
+    {from:45, to:55, color:"#a3e635"},
+    {from:55, to:75, color:"#facc15"},
+    {from:75, to:100, color:"#f87171"},
   ];
-  const [btc]=await Promise.all(jobs);
-  $('status').textContent = `마지막 업데이트: ${new Date().toLocaleString('ko-KR')}`;
+  zones.forEach(z=>{
+    const a0 = Math.PI + (z.from/100)*Math.PI;
+    const a1 = Math.PI + (z.to/100)*Math.PI;
+    ctx.beginPath(); ctx.arc(cx,cy,r,a0,a1); ctx.lineWidth=16; ctx.strokeStyle=z.color; ctx.stroke();
+  });
+  if(fngData.length){
+    const v = fngData[fngData.length-1].value;
+    const a = Math.PI + (v/100)*Math.PI;
+    const nx = cx + Math.cos(a)*(r-24), ny = cy + Math.sin(a)*(r-24);
+    ctx.strokeStyle="#e7ebf5"; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(nx,ny); ctx.stroke();
+    ctx.fillStyle="#e7ebf5"; ctx.beginPath(); ctx.arc(cx,cy,4,0,7); ctx.fill();
+  }
 }
-$('refreshBtn').addEventListener('click',loadAll);
-loadAll();
+
+function drawFngChart(){
+  const cv = $("fngChart");
+  const dpr = window.devicePixelRatio||1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if(w===0||h===0||!fngData.length) return;
+  cv.width=w*dpr; cv.height=h*dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  const data = fngData.slice(-90);
+  const L=28,R=8,T=8,B=8,pw=w-L-R,ph=h-T-B;
+  const t0=data[0].t, t1=data[data.length-1].t;
+  const xOf = t => L + (t-t0)/(t1-t0||1)*pw;
+  const yOf = v => T + (100-v)/100*ph;
+  ctx.strokeStyle="#232c42"; ctx.lineWidth=1; ctx.font="9.5px ui-monospace,Menlo,monospace";
+  [0,50,100].forEach(v=>{ const y=yOf(v); ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke(); ctx.fillStyle="#7c8aa5"; ctx.fillText(v,2,y+3); });
+  ctx.strokeStyle="#facc15"; ctx.lineWidth=1.6; ctx.beginPath();
+  data.forEach((d,i)=>{ const x=xOf(d.t), y=yOf(d.value); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+}
+
+function drawCycleAll(){ drawPriceChart(); drawMMChart(); drawFngChart(); drawFngGauge(); }
+
+$("rangeSel").onchange = drawCycleAll;
+window.addEventListener("resize", drawCycleAll);
+
+$("altRefresh").onclick = async () => {
+  $("altBox").className = "loading";
+  $("altBox").textContent = "불러오는 중…";
+  try{
+    const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&price_change_percentage=90d");
+    const list = await res.json();
+    const btc = list.find(c => c.id === "bitcoin");
+    if(!btc) throw new Error("no btc");
+    const btcChg = btc.price_change_percentage_90d_in_currency;
+    const alts = list.filter(c => c.id !== "bitcoin" && c.price_change_percentage_90d_in_currency != null);
+    const outperform = alts.filter(c => c.price_change_percentage_90d_in_currency > btcChg).length;
+    const idx = Math.round(outperform / alts.length * 100);
+    const label = idx >= 75 ? "알트코인 시즌" : idx <= 25 ? "비트코인 시즌" : "중립(혼조)";
+    $("altBox").className = "";
+    $("altBox").innerHTML = `<div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap">
+      <div style="font-size:32px; font-weight:800">${idx}<span style="font-size:16px; color:var(--muted)">/100</span></div>
+      <div class="tag ${idx>=75?'zone-red':idx<=25?'zone-blue':'zone-green'}" style="font-size:13px">${label}</div>
+      <div class="note" style="margin:0">시총 상위 50개 중 ${outperform}개 코인이 최근 90일간 BTC(${btcChg.toFixed(1)}%)보다 더 많이 상승</div>
+    </div>`;
+  }catch(e){
+    $("altBox").textContent = "불러오기 실패 — 잠시 후 다시 시도해주세요.";
+  }
+};
+
+function priceAtOrBefore(hist, t){
+  if(!hist || !hist.length) return null;
+  if(t <= hist[0].t) return hist[0].price;
+  let lo = 0, hi = hist.length - 1;
+  while(lo < hi){
+    const mid = (lo + hi + 1) >> 1;
+    if(hist[mid].t <= t) lo = mid; else hi = mid - 1;
+  }
+  return hist[lo].price;
+}
+
+function relColor(rel){
+  const steps  = [-40,-30,-20,-10,0,10,20,30,40];
+  const palette = ["#7f1d1d","#b91c1c","#dc2626","#f87171","#fca5a5","#5eead4","#2dd4bf","#14b8a6","#0d9488","#065f46"];
+  let idx = steps.findIndex(s => rel < s);
+  if(idx === -1) idx = palette.length - 1;
+  return palette[idx];
+}
+const fmtP = x => (x>=0?"+":"") + x.toFixed(1) + "%";
+
+function computeRelBars(days){
+  const now = Date.now();
+  const windowStart = now - days*86400000;
+  const btcHist = histCache.BTC || [];
+  if(!btcHist.length) return [];
+  const out = [];
+  altCoins().forEach(c => {
+    const hist = histCache[c];
+    if(!hist || !hist.length) return;
+    const start = Math.max(windowStart, hist[0].t, btcHist[0].t);
+    const altStartP = priceAtOrBefore(hist, start);
+    const btcStartP = priceAtOrBefore(btcHist, start);
+    const altEndP = hist[hist.length-1].price;
+    const btcEndP = btcHist[btcHist.length-1].price;
+    if(!altStartP || !btcStartP) return;
+    const altPct = (altEndP/altStartP - 1) * 100;
+    const btcPct = (btcEndP/btcStartP - 1) * 100;
+    const shortByDays = Math.round((windowStart - hist[0].t) / 86400000);
+    out.push({ c, rel: altPct - btcPct, alt: altPct, btc: btcPct, partial: shortByDays < -3 });
+  });
+  out.sort((a,b) => b.rel - a.rel);
+  return out;
+}
+
+function renderRelBars(){
+  const box = $("relBars");
+  if(!histCache.BTC || !histCache.BTC.length){
+    box.innerHTML = '<div class="empty">데이터를 불러오지 못했어요. 잠시 후 자동으로 다시 시도합니다.</div>';
+    return;
+  }
+  const bars = computeRelBars(relPeriodDays);
+  if(!bars.length){ box.innerHTML = '<div class="empty">표시할 코인이 없습니다.</div>'; return; }
+  const scaleMax = Math.max(20, Math.ceil(Math.max(...bars.map(b=>Math.abs(b.rel))) / 10) * 10);
+  box.innerHTML = bars.map(b => {
+    const w = Math.min(50, Math.abs(b.rel) / scaleMax * 50);
+    const side = b.rel >= 0 ? `left:50%; width:${w}%;` : `right:50%; width:${w}%;`;
+    const note = b.partial ? ' <span style="color:var(--muted); font-weight:500">(상장 후 전체)</span>' : '';
+    return `<div class="relrow">
+      <div class="rname"><i class="dot-sw" style="background:${colorFor(b.c)}"></i>${b.c}</div>
+      <div class="rtrack"><div class="rzero"></div><div class="rfill" style="${side} background:${relColor(b.rel)}"></div></div>
+      <div class="rval ${b.rel>=0?'pos':'neg'}">${fmtP(b.rel)}${note}</div>
+    </div>`;
+  }).join("");
+}
+
+$("periodBtns").addEventListener("click", e => {
+  const btn = e.target.closest(".pbtn");
+  if(!btn) return;
+  document.querySelectorAll(".pbtn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  relPeriodDays = +btn.dataset.days;
+  renderRelBars();
+});
+
+$("applyCustomDays").onclick = () => {
+  const n = +$("customDays").value;
+  if(!n || n <= 0) return;
+  const unit = +$("customUnit").value;
+  relPeriodDays = Math.round(n * unit);
+  document.querySelectorAll(".pbtn").forEach(b => b.classList.remove("active"));
+  renderRelBars();
+};
+$("customDays").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $("applyCustomDays").click(); } });
+
+
+$("exchange").onchange = connect;
+$("threshold").onchange = render;
+$("multiple").onchange = render;
+$("window").onchange = drawRelChart;
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+
+renderLegend();
+renderCoinPanel();
+connect();
+loadHistoryFor(COINS);
+loadFng();
+loadDominance();
 </script>
 </body>
 </html>
