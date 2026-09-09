@@ -345,10 +345,10 @@
         <h3>기간별 BTC 대비 상대강도</h3>
       </div>
       <div class="periodbtns" id="periodBtns">
-        <button type="button" class="pbtn" data-days="30">1개월</button>
+        <button type="button" class="pbtn active" data-days="30">1개월</button>
         <button type="button" class="pbtn" data-days="90">3개월</button>
         <button type="button" class="pbtn" data-days="182">6개월</button>
-        <button type="button" class="pbtn active" data-days="365">1년</button>
+        <button type="button" class="pbtn" data-days="365">1년</button>
         <button type="button" class="pbtn" data-days="730">2년</button>
         <button type="button" class="pbtn" data-days="1095">3년</button>
         <button type="button" class="pbtn" data-days="1460">4년</button>
@@ -730,7 +730,7 @@ window.addEventListener("resize", drawRelChart);
 
 /* ---- 기간별(1개월~10년) BTC 대비 상대강도 바 차트 ---- */
 let histCache = {}; // symbol -> [{t, price}, ...] 오름차순, 바이낸스 일봉
-let relPeriodDays = 365;
+let relPeriodDays = 30;
 
 async function fetchCoinHistory(symbol){
   const start = Date.UTC(2017, 0, 1);
