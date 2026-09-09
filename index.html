@@ -282,9 +282,11 @@
       <div class="phead">
         <h2>BTC 장기 가격 차트 (메이어 배수 구간 색상)</h2>
         <select id="rangeSel">
-          <option value="365">최근 1년</option>
-          <option value="1460">최근 4년(반감기 한 사이클)</option>
-          <option value="99999" selected>전체 기간 (2017년~)</option>
+          <option value="5m">5분봉 · 최근 1일</option>
+          <option value="1h">1시간봉 · 최근 1개월</option>
+          <option value="d365" selected>일봉 · 최근 1년</option>
+          <option value="d1460">일봉 · 최근 4년(반감기 한 사이클)</option>
+          <option value="d99999">일봉 · 전체 기간 (2017년~)</option>
         </select>
       </div>
       <p class="pdesc">가격 로그 스케일 · 바이낸스 BTCUSDT 상장(2017년 8월) 이후 전체 일봉 데이터 기준. 선 색깔은 그 날의 "메이어 배수"(현재가 ÷ 200일 이동평균) 구간을 나타냅니다 — MVRV Z-Score 차트를 보는 방식과 동일한 개념입니다. 단, 이건 온체인 실현가치가 아니라 순수 가격 데이터로 계산한 근사 지표입니다.</p>
@@ -825,12 +827,30 @@ async function loadDominance(){
   }catch(e){ $("statDom").textContent = "오류"; }
 }
 
+let liveBtcUsd = null;
+let btcUsdWs = null;
+function connectBtcUsdFeed(){
+  if(btcUsdWs){ try{ btcUsdWs.close(); }catch(e){} }
+  btcUsdWs = new WebSocket("wss://stream.binance.com:9443/ws/btcusdt@ticker");
+  btcUsdWs.onmessage = (e) => {
+    try{
+      const d = JSON.parse(e.data);
+      liveBtcUsd = +d.c;
+      updateStatCards();
+    }catch(err){}
+  };
+  btcUsdWs.onclose = () => { setTimeout(connectBtcUsdFeed, 3000); };
+  btcUsdWs.onerror = () => { try{ btcUsdWs.close(); }catch(e){} };
+}
+
 function updateStatCards(){
   if(dailyPrices.length){
     const last = dailyPrices[dailyPrices.length-1];
-    $("statPrice").textContent = fmtUsd(last.price);
-    $("statMM").textContent = last.mm.toFixed(2) + "×";
-    const z = zoneOf(last.mm);
+    const price = liveBtcUsd || last.price;
+    const mm = liveBtcUsd ? (liveBtcUsd / last.ma200) : last.mm;
+    $("statPrice").textContent = fmtUsd(price);
+    $("statMM").textContent = mm.toFixed(2) + "×";
+    const z = zoneOf(mm);
     const mmTag = $("statMMTag"); mmTag.textContent = z.name; mmTag.className = "tag " + z.cls;
   }
   if(fngData.length){
@@ -843,8 +863,58 @@ function updateStatCards(){
   }
 }
 
+let intradayCache = {}; // "5m" | "1h" -> [{t, price}]
+let intradayLoading = {};
+
+async function fetchIntraday(interval){
+  if(intradayCache[interval]) return intradayCache[interval];
+  const limit = interval === "5m" ? 288 : 720; // 5분×288=1일, 1시간×720=30일
+  const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("intraday fetch failed: " + res.status);
+  const rows = await res.json();
+  const arr = rows.map(k => ({ t: k[0], price: parseFloat(k[4]) }));
+  intradayCache[interval] = arr;
+  return arr;
+}
+
+function drawLoadingOnCanvas(cv, msg){
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if(w===0||h===0) return;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = "#7c8aa5"; ctx.font = "12px -apple-system,sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(msg, w/2, h/2);
+  ctx.textAlign = "left";
+}
+
+async function onRangeChange(){
+  const val = $("rangeSel").value;
+  if(val === "5m" || val === "1h"){
+    if(!intradayCache[val]){
+      drawLoadingOnCanvas($("priceChart"), "불러오는 중…");
+      try{ await fetchIntraday(val); }
+      catch(e){ drawLoadingOnCanvas($("priceChart"), "불러오기 실패 — 다시 선택해보세요"); return; }
+    }
+  }
+  drawPriceChart();
+}
+
 function drawPriceChart(){
   const cv = $("priceChart");
+  const val = $("rangeSel").value;
+  const isIntraday = val === "5m" || val === "1h";
+
+  if(isIntraday){
+    const src = intradayCache[val];
+    if(!src || src.length < 2){ drawLoadingOnCanvas(cv, "불러오는 중…"); return; }
+    drawSimplePriceLine(cv, src, val);
+    return;
+  }
+
   const dpr = window.devicePixelRatio || 1;
   const w = cv.clientWidth, h = cv.clientHeight;
   if(w===0||h===0||!dailyPrices.length) return;
@@ -853,7 +923,7 @@ function drawPriceChart(){
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,w,h);
 
-  const days = +$("rangeSel").value;
+  const days = +val.slice(1); // "d365" -> 365
   const cutoff = Date.now() - days*86400000;
   const data = dailyPrices.filter(d => d.t >= cutoff);
   if(data.length < 2) return;
@@ -902,6 +972,57 @@ function drawPriceChart(){
   }
 }
 
+function drawSimplePriceLine(cv, data, interval){
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if(w===0||h===0) return;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const L=64, R=14, T=14, B=26, pw=w-L-R, ph=h-T-B;
+  const prices = data.map(d=>d.price);
+  let min = Math.min(...prices), max = Math.max(...prices);
+  const pad = (max-min)*0.12 || max*0.01; min -= pad; max += pad;
+  const t0 = data[0].t, t1 = data[data.length-1].t;
+
+  const xOf = t => L + (t-t0)/(t1-t0)*pw;
+  const yOf = price => T + (max-price)/(max-min)*ph;
+
+  ctx.strokeStyle="#232c42"; ctx.lineWidth=1; ctx.font="10.5px ui-monospace,Menlo,monospace";
+  for(let i=0;i<=4;i++){
+    const v = max - (max-min)*i/4;
+    const y = T + ph*i/4;
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke();
+    ctx.fillStyle="#7c8aa5";
+    const label = v>=1000 ? "$"+Math.round(v/1000)+"k" : "$"+Math.round(v);
+    ctx.fillText(label, 4, y+3.5);
+  }
+
+  // x축 시간 라벨 (5~6개)
+  ctx.textAlign="center";
+  const steps = 5;
+  for(let i=0;i<=steps;i++){
+    const t = t0 + (t1-t0)*i/steps;
+    const x = xOf(t);
+    const dt = new Date(t);
+    const label = interval === "5m"
+      ? dt.getHours().toString().padStart(2,"0")+":"+dt.getMinutes().toString().padStart(2,"0")
+      : (dt.getMonth()+1)+"/"+dt.getDate();
+    ctx.strokeStyle="#1a2440"; ctx.beginPath(); ctx.moveTo(x,T); ctx.lineTo(x,h-B); ctx.stroke();
+    ctx.fillStyle="#7c8aa5"; ctx.fillText(label, x, h-8);
+  }
+  ctx.textAlign="left";
+
+  const rising = prices[prices.length-1] >= prices[0];
+  ctx.strokeStyle = rising ? "#2dd4bf" : "#fb7185";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  data.forEach((d,i)=>{ const x=xOf(d.t), y=yOf(d.price); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+}
+
 function drawMMChart(){
   const cv = $("mmChart");
   const dpr = window.devicePixelRatio || 1;
@@ -912,9 +1033,7 @@ function drawMMChart(){
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,w,h);
 
-  const days = +$("rangeSel").value;
-  const cutoff = Date.now() - days*86400000;
-  const data = dailyPrices.filter(d => d.t >= cutoff);
+  const data = dailyPrices; // 항상 전체 일봉 기준 (가격 차트의 기간 선택과 무관)
   if(data.length < 2) return;
 
   const L=36, R=14, T=10, B=8, pw=w-L-R, ph=h-T-B;
@@ -994,7 +1113,7 @@ function drawFngChart(){
 
 function drawCycleAll(){ drawPriceChart(); drawMMChart(); drawFngChart(); drawFngGauge(); }
 
-$("rangeSel").onchange = drawCycleAll;
+$("rangeSel").onchange = onRangeChange;
 window.addEventListener("resize", drawCycleAll);
 
 $("altRefresh").onclick = async () => {
@@ -1121,6 +1240,7 @@ connect();
 loadHistoryFor(COINS);
 loadFng();
 loadDominance();
+connectBtcUsdFeed();
 </script>
 </body>
 </html>
