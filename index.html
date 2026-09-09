@@ -282,13 +282,13 @@
       <div class="phead">
         <h2>BTC 장기 가격 차트 (메이어 배수 구간 색상)</h2>
         <select id="rangeSel">
-          <option value="1d" selected>1일봉 (최근 1년)</option>
-          <option value="1mo">1개월봉 (최근 4년)</option>
-          <option value="1y">1년봉 (전체 요약)</option>
-          <option value="all">전체 기간 (2017년~)</option>
+          <option value="1d">1일</option>
+          <option value="1mo">1개월</option>
+          <option value="1y" selected>1년</option>
+          <option value="10y">10년</option>
         </select>
       </div>
-      <p class="pdesc">가격 로그 스케일 · 바이낸스 BTCUSDT 상장(2017년 8월) 이후 데이터 기준. 1일봉·1개월봉·1년봉은 봉 단위(캔들 간격)만 다를 뿐 같은 일봉 데이터를 요약한 것이고, "전체 기간"은 2017년부터 지금까지를 일봉 그대로 보여줍니다. 선 색깔은 그 시점의 "메이어 배수"(현재가 ÷ 200일 이동평균) 구간을 나타냅니다 — MVRV Z-Score 차트를 보는 방식과 동일한 개념입니다. 단, 이건 온체인 실현가치가 아니라 순수 가격 데이터로 계산한 근사 지표입니다.</p>
+      <p class="pdesc">가격 로그 스케일 · 바이낸스 BTCUSDT 상장(2017년 8월) 이후 데이터 기준. "1일"은 최근 24시간(5분 단위), "1개월/1년/10년"은 그 기간 동안의 일봉을 보여줍니다. 선 색깔은 그 시점의 "메이어 배수"(현재가 ÷ 200일 이동평균) 구간을 나타냅니다 — MVRV Z-Score 차트를 보는 방식과 동일한 개념입니다. 단, 이건 온체인 실현가치가 아니라 순수 가격 데이터로 계산한 근사 지표입니다.</p>
       <canvas id="priceChart" class="chart"></canvas>
       <div class="legend2">
         <span><i class="sw" style="background:#38bdf8"></i>&lt; 1.0 저평가(과거 사이클 저점권)</span>
@@ -875,45 +875,41 @@ function drawLoadingOnCanvas(cv, msg){
   ctx.textAlign = "left";
 }
 
-function resampleMonthly(data){
-  const out = [];
-  let lastKey = null;
-  data.forEach(d => {
-    const dt = new Date(d.t);
-    const key = dt.getFullYear() + "-" + dt.getMonth();
-    if(key !== lastKey){ out.push(d); lastKey = key; }
-    else { out[out.length-1] = d; } // 그 달의 마지막(최신) 일봉으로 갱신
-  });
-  return out;
+let intraday5m = null;
+async function fetchIntraday5m(){
+  if(intraday5m) return intraday5m;
+  const url = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=288";
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("intraday fetch failed: " + res.status);
+  const rows = await res.json();
+  intraday5m = rows.map(k => ({ t: k[0], price: parseFloat(k[4]) }));
+  return intraday5m;
 }
 
-function resampleYearly(data){
-  const out = [];
-  let lastKey = null;
-  data.forEach(d => {
-    const key = new Date(d.t).getFullYear();
-    if(key !== lastKey){ out.push(d); lastKey = key; }
-    else { out[out.length-1] = d; } // 그 해의 마지막(최신) 일봉으로 갱신
-  });
-  return out;
+async function onRangeChange(){
+  const val = $("rangeSel").value;
+  if(val === "1d" && !intraday5m){
+    drawLoadingOnCanvas($("priceChart"), "불러오는 중…");
+    try{ await fetchIntraday5m(); }
+    catch(e){ drawLoadingOnCanvas($("priceChart"), "불러오기 실패 — 다시 선택해보세요"); return; }
+  }
+  drawPriceChart();
 }
 
 function drawPriceChart(){
   const cv = $("priceChart");
   if(!dailyPrices.length){ drawLoadingOnCanvas(cv, "과거 데이터를 불러오는 중…"); return; }
 
-  const val = $("rangeSel").value; // "1d" | "1mo" | "1y" | "all"
+  const val = $("rangeSel").value; // "1d" | "1mo" | "1y" | "10y"
   let data;
   if(val === "1d"){
-    const cutoff = Date.now() - 365*86400000;
-    data = dailyPrices.filter(d => d.t >= cutoff);
-  } else if(val === "1mo"){
-    const cutoff = Date.now() - 1460*86400000;
-    data = resampleMonthly(dailyPrices.filter(d => d.t >= cutoff));
-  } else if(val === "1y"){
-    data = resampleYearly(dailyPrices);
+    if(!intraday5m || intraday5m.length < 2){ drawLoadingOnCanvas(cv, "불러오는 중…"); return; }
+    const ma200 = dailyPrices[dailyPrices.length-1].ma200;
+    data = intraday5m.map(d => ({ t: d.t, price: d.price, mm: d.price / ma200 }));
   } else {
-    data = dailyPrices; // all: 2017년~전체
+    const days = val === "1mo" ? 30 : val === "1y" ? 365 : 3650;
+    const cutoff = Date.now() - days*86400000;
+    data = dailyPrices.filter(d => d.t >= cutoff);
   }
   if(data.length < 2) return;
 
@@ -947,14 +943,29 @@ function drawPriceChart(){
     ctx.fillText(label, 4, y+3.5);
   });
 
-  const y0=new Date(t0).getFullYear(), y1=new Date(t1).getFullYear();
   ctx.textAlign="center";
-  for(let y=y0;y<=y1;y++){
-    const t=new Date(y,0,1).getTime();
-    if(t<t0||t>t1) continue;
-    const x=xOf(t);
-    ctx.strokeStyle="#1a2440"; ctx.beginPath(); ctx.moveTo(x,T); ctx.lineTo(x,h-B); ctx.stroke();
-    ctx.fillStyle="#7c8aa5"; ctx.fillText(String(y), x, h-8);
+  const spanMs = t1 - t0;
+  if(spanMs < 3*86400000){
+    // 1일 보기: 시:분 라벨
+    const steps = 6;
+    for(let i=0;i<=steps;i++){
+      const t = t0 + spanMs*i/steps;
+      const x = xOf(t);
+      const dt = new Date(t);
+      const label = dt.getHours().toString().padStart(2,"0")+":"+dt.getMinutes().toString().padStart(2,"0");
+      ctx.strokeStyle="#1a2440"; ctx.beginPath(); ctx.moveTo(x,T); ctx.lineTo(x,h-B); ctx.stroke();
+      ctx.fillStyle="#7c8aa5"; ctx.fillText(label, x, h-8);
+    }
+  } else {
+    // 1개월/1년/10년 보기: 연도 라벨
+    const y0=new Date(t0).getFullYear(), y1=new Date(t1).getFullYear();
+    for(let y=y0;y<=y1;y++){
+      const t=new Date(y,0,1).getTime();
+      if(t<t0||t>t1) continue;
+      const x=xOf(t);
+      ctx.strokeStyle="#1a2440"; ctx.beginPath(); ctx.moveTo(x,T); ctx.lineTo(x,h-B); ctx.stroke();
+      ctx.fillStyle="#7c8aa5"; ctx.fillText(String(y), x, h-8);
+    }
   }
   ctx.textAlign="left";
 
@@ -1059,7 +1070,7 @@ function drawFngChart(){
 
 function drawCycleAll(){ drawPriceChart(); drawMMChart(); drawFngChart(); drawFngGauge(); }
 
-$("rangeSel").onchange = drawPriceChart;
+$("rangeSel").onchange = onRangeChange;
 window.addEventListener("resize", drawCycleAll);
 
 $("altRefresh").onclick = async () => {

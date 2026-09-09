@@ -1,4 +1,4 @@
-const CACHE = "btc-radar-v14";
+const CACHE = "btc-radar-v15";
 const ASSETS = ["./", "./index.html", "./cycle.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
