@@ -213,6 +213,58 @@
     th,td{font-size:12px; padding:9px 7px}
     th:nth-child(3),td:nth-child(3){display:none}
   }
+
+  /* ===== 17종 실시간 수익률 비교 모니터 ===== */
+  .c17-panel{overflow:hidden}
+  .c17-sub{font-size:11px;color:var(--muted);margin-top:4px}
+  .c17-live{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
+  #c17LiveDot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+  #c17LiveDot.live{background:var(--teal);box-shadow:0 0 0 0 rgba(45,212,191,.5);animation:pulse 1.8s infinite}
+  .c17-toolbar{margin:12px 0 10px;padding:10px;background:var(--bg2);border:1px solid var(--line);border-radius:12px}
+  .c17-toolbar-title{font-size:11.5px;color:var(--muted);font-weight:700;margin-bottom:8px}
+  .c17-selectors{display:flex;flex-wrap:wrap;gap:6px}
+  .c17-sel,.c17-all{
+    border:1px solid var(--line);background:var(--panel2);color:var(--muted);
+    border-radius:999px;padding:6px 9px;font-size:11.5px;font-weight:700;cursor:pointer;transition:.15s ease;
+  }
+  .c17-sel.active{color:var(--text);border-color:#46516d;background:#1a2440}
+  .c17-sel.strong{font-weight:900;border-color:var(--teal);color:var(--teal);box-shadow:0 0 0 1px rgba(45,212,191,.08)}
+  .c17-sel.btc{color:#ffd37a;border-color:#6b4c16}
+  .c17-sel .c17-pct{font-family:ui-monospace,Menlo,monospace;margin-left:3px}
+  .c17-all.active{background:#1a2440;border-color:var(--violet);color:#c8beff}
+  .c17-invest{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    padding:11px 12px;background:rgba(22,31,53,.55);border:1px solid var(--line);border-radius:12px;margin-bottom:10px
+  }
+  .c17-invest-title{font-size:12.5px;font-weight:800}
+  .c17-invest-desc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5}
+  .c17-money label{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);font-weight:700}
+  #c17Investment{
+    width:135px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+    color:var(--text);padding:7px 9px;font-size:12.5px;font-family:ui-monospace,Menlo,monospace
+  }
+  .c17-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+  .c17-card{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:10px}
+  .c17-card .k{font-size:10.5px;color:var(--muted);font-weight:700}
+  .c17-card .v{font-size:17px;font-weight:900;margin-top:4px}
+  .c17-card .s{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .c17-chart-wrap{position:relative}
+  #c17Canvas{height:430px;background:var(--bg2)}
+  .c17-breakouts{margin-top:9px;display:flex;flex-wrap:wrap;gap:6px}
+  .c17-breakout{
+    padding:5px 8px;border-radius:8px;background:#142b27;border:1px solid #20584f;
+    color:var(--teal);font-size:11px;font-weight:800
+  }
+  .c17-breakout small{font-weight:600;color:var(--muted);margin-left:5px}
+  .c17-note{font-size:11px;color:var(--muted);line-height:1.65;margin-top:9px}
+  @media(max-width:760px){
+    .c17-summary{grid-template-columns:1fr 1fr}
+    .c17-summary .c17-card:last-child{grid-column:1/-1}
+    #c17Canvas{height:300px}
+    .c17-money{width:100%}
+    #c17Investment{width:150px}
+  }
+
 </style>
 </head>
 <body>
@@ -397,7 +449,48 @@
     </div>
   </div>
 
-  <section>
+  
+    <!-- 17종 실시간 수익률 비교 모니터 -->
+    <section>
+      <div class="chartpanel c17-panel">
+        <div class="chead">
+          <div>
+            <h3>17종 실시간 수익률 비교 모니터</h3>
+            <div class="c17-sub">같은 기준시점 = 0% · BTC와 각 알트의 상승률을 한눈에 비교</div>
+          </div>
+          <div class="c17-live"><span id="c17LiveDot"></span><span id="c17LiveText">실시간 대기</span></div>
+        </div>
+
+        <div class="c17-toolbar">
+          <div class="c17-toolbar-title">보고 싶은 코인만 클릭하세요 · 처음에는 전체 17종이 표시됩니다</div>
+          <button type="button" id="c17All" class="c17-all active">전체 17</button>
+          <div id="c17Selectors" class="c17-selectors"></div>
+        </div>
+
+        <div class="c17-invest">
+          <div>
+            <div class="c17-invest-title">동일 투자금 평가금액 비교</div>
+            <div class="c17-invest-desc">예: BTC 100만원 + ONDO 100만원. 수량이 달라도 수익률로 비교하므로 현재 평가금액을 바로 확인할 수 있습니다.</div>
+          </div>
+          <div class="c17-money">
+            <label>코인별 투자금
+              <input id="c17Investment" type="number" min="0" step="10000" value="1000000">
+              <span>원</span>
+            </label>
+          </div>
+        </div>
+
+        <div id="c17Summary" class="c17-summary"></div>
+        <div class="c17-chart-wrap"><canvas id="c17Canvas" class="chart"></canvas></div>
+        <div id="c17Breakouts" class="c17-breakouts"></div>
+        <div class="c17-note">
+          각 코인의 기준점 대비 가격변화율을 같은 화면에 표시합니다. BTC보다 위에 있는 선은 BTC보다 상승률이 높은 코인입니다.
+          아래에서 위로 BTC 수익률을 처음 넘어서는 순간에는 <b>★ BTC 상향돌파</b>가 기록됩니다.
+        </div>
+      </div>
+    </section>
+
+<section>
     <div class="chartpanel">
       <div class="chead">
         <h3>BTC 대비 상대강도(RS) 추이</h3>
@@ -427,9 +520,9 @@
 </main>
 
 <script>
-const DEFAULT_COINS = ["BTC","ETH","XRP","SOL","ADA","HBAR","AAVE","LINK","ONDO","TAO"];
-const CANDIDATES = ["DOGE","DOT","AVAX","POL","UNI","ICP","FIL","WLD","ATOM","NEAR","SUI","ARB","OP","INJ","TRX","LTC","BCH","ETC","XLM","SEI"];
-const MAX_COINS = 14;
+const DEFAULT_COINS = ["BTC","ETH","SOL","XRP","HBAR","ONDO","LINK","AVAX","DOGE","TAO","UNI","AAVE","SUI","ADA","XLM","NEAR","ICP"];
+const CANDIDATES = ["ETH","SOL","XRP","HBAR","ONDO","LINK","AVAX","DOGE","TAO","UNI","AAVE","SUI","ADA","XLM","NEAR","ICP","DOT","POL","FIL","WLD","ATOM","ARB","OP","INJ","TRX","LTC","BCH","ETC","SEI"];
+const MAX_COINS = 17;
 const BTC_COLOR = "#f5a623";
 
 function loadSavedCoins(){
@@ -437,7 +530,10 @@ function loadSavedCoins(){
     const raw = localStorage.getItem("btcRadarCoins");
     if(raw){
       const arr = JSON.parse(raw);
-      if(Array.isArray(arr) && arr[0] === "BTC" && arr.length >= 2) return arr;
+      if(Array.isArray(arr) && arr[0] === "BTC" && arr.length >= 2){
+        const merged = ["BTC", ...DEFAULT_COINS.slice(1), ...arr.filter(c => c !== "BTC")];
+        return [...new Set(merged)].slice(0, MAX_COINS);
+      }
     }
   }catch(e){}
   return null;
@@ -465,9 +561,11 @@ function reset(){
   if(!haveAll()) return;
   base = {...p}; baseTime = new Date(); events = []; lastDir = 0; lock = 0;
   COINS.forEach(c => series[c] = []);
+  c17ResetState();
   render();
   $("basetime").textContent = baseTime.toLocaleTimeString();
   $("log").innerHTML = '<div class="empty">아직 이벤트가 없습니다.</div>';
+  c17Render();
 }
 
 function renderLegend(){
@@ -552,6 +650,7 @@ function record(c){
   let arr = series[c];
   let i = 0; while(i < arr.length && arr[i].t < cutoff) i++;
   if(i > 0) series[c] = arr.slice(i);
+  c17Render();
 }
 
 function detect(){
@@ -660,6 +759,217 @@ function connect(){
   ws.onclose = () => { setConn("재연결 중…", false); setTimeout(connect, 2500); };
 }
 
+
+/* ===== 17종 실시간 수익률 비교 모니터 ===== */
+const C17_COLORS = {
+  BTC:"#f5a623", ETH:"#a78bfa", SOL:"#22c55e", XRP:"#38bdf8", HBAR:"#fb7185",
+  ONDO:"#34d399", LINK:"#60a5fa", AVAX:"#ef4444", DOGE:"#eab308", TAO:"#f97316",
+  UNI:"#c084fc", AAVE:"#06b6d4", SUI:"#14b8a6", ADA:"#818cf8", XLM:"#94a3b8",
+  NEAR:"#ffffff", ICP:"#64748b"
+};
+let c17Selected = new Set(DEFAULT_COINS);
+let c17PrevAbove = {};
+let c17BreakoutList = [];
+let c17LastBreakoutAt = {};
+
+function c17Color(sym){ return C17_COLORS[sym] || colorFor(sym); }
+
+function c17GetRet(sym){
+  if(base[sym] == null || p[sym] == null || !base[sym]) return null;
+  return pct(p[sym], base[sym]);
+}
+
+function c17EnsureCoins(){
+  const allowed = new Set(COINS);
+  c17Selected = new Set([...c17Selected].filter(c => allowed.has(c)));
+  if(!c17Selected.size && COINS.includes("BTC")) c17Selected.add("BTC");
+  c17RenderSelectors();
+}
+
+function c17ResetState(){
+  c17PrevAbove = {};
+  c17BreakoutList = [];
+  c17LastBreakoutAt = {};
+  c17Selected = new Set(COINS);
+  c17RenderSelectors();
+}
+
+function c17RenderSelectors(){
+  const box=$("c17Selectors");
+  if(!box) return;
+  const b=c17GetRet("BTC");
+  box.innerHTML=COINS.map(sym=>{
+    const r=c17GetRet(sym);
+    const strong=sym!=="BTC" && r!=null && b!=null && r>b;
+    const active=c17Selected.has(sym);
+    const cls=["c17-sel",active?"active":"",strong?"strong":"",sym==="BTC"?"btc":""].filter(Boolean).join(" ");
+    return `<button type="button" class="${cls}" data-c17="${sym}">
+      ${strong?"★ ":""}${sym}<span class="c17-pct">${r==null?"--":fmt(r)}</span>
+    </button>`;
+  }).join("");
+  $("c17All").classList.toggle("active",c17Selected.size===COINS.length);
+}
+
+function c17Toggle(sym){
+  if(!COINS.includes(sym)) return;
+  if(c17Selected.has(sym)) c17Selected.delete(sym);
+  else c17Selected.add(sym);
+  if(!c17Selected.size) c17Selected.add("BTC");
+  c17RenderSelectors();
+  c17Render();
+}
+
+function c17DetectBreakouts(){
+  const b=c17GetRet("BTC");
+  if(b==null) return;
+  const now=Date.now();
+  COINS.filter(c=>c!=="BTC").forEach(c=>{
+    const r=c17GetRet(c);
+    if(r==null) return;
+    const above=r>b;
+    const prev=c17PrevAbove[c];
+    if(prev===false && above && now-(c17LastBreakoutAt[c]||0)>60000){
+      c17BreakoutList.unshift({c,t:now,r,b});
+      c17BreakoutList=c17BreakoutList.slice(0,8);
+      c17LastBreakoutAt[c]=now;
+    }
+    c17PrevAbove[c]=above;
+  });
+}
+
+function c17RenderSummary(){
+  const box=$("c17Summary");
+  if(!box) return;
+  const b=c17GetRet("BTC");
+  if(b==null){
+    box.innerHTML='<div class="c17-card"><div class="k">BTC</div><div class="v muted">데이터 대기</div></div>';
+    return;
+  }
+  const rows=COINS.filter(c=>c!=="BTC").map(c=>({c,r:c17GetRet(c)})).filter(x=>x.r!=null).sort((a,z)=>z.r-a.r);
+  const strongest=rows[0];
+  const invest=Math.max(0,+($("c17Investment")?.value||1000000));
+  const btcValue=invest*(1+b);
+  const strongValue=strongest?invest*(1+strongest.r):null;
+  const diff=strongest?strongValue-btcValue:null;
+  box.innerHTML=`
+    <div class="c17-card"><div class="k">BTC 현재 수익률</div>
+      <div class="v mono ${b>=0?"pos":"neg"}">${fmt(b)}</div>
+      <div class="s">${Math.round(invest).toLocaleString()}원 → ${Math.round(btcValue).toLocaleString()}원</div>
+    </div>
+    <div class="c17-card"><div class="k">현재 가장 강한 코인</div>
+      <div class="v mono ${strongest?.r>=0?"pos":"neg"}">${strongest?strongest.c+" "+fmt(strongest.r):"--"}</div>
+      <div class="s">${strongest?"BTC 대비 "+fmt(strongest.r-b):"비교할 데이터 없음"}</div>
+    </div>
+    <div class="c17-card"><div class="k">${strongest?strongest.c+" vs BTC 평가금액":"평가금액 차이"}</div>
+      <div class="v mono ${diff>=0?"pos":"neg"}">${diff==null?"--":(diff>=0?"+":"")+Math.round(diff).toLocaleString()+"원"}</div>
+      <div class="s">${strongest?"같은 투자금 기준 현재 차이":""}</div>
+    </div>`;
+}
+
+function c17RenderBreakouts(){
+  const box=$("c17Breakouts");
+  if(!box) return;
+  if(!c17BreakoutList.length){
+    box.innerHTML='<span class="muted" style="font-size:11px">최근 BTC 상향돌파 없음</span>';
+    return;
+  }
+  box.innerHTML=c17BreakoutList.map(x=>{
+    const d=new Date(x.t);
+    return `<span class="c17-breakout">★ ${x.c} BTC 상향돌파 <small>${d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"})} · BTC ${fmt(x.b)} → ${x.c} ${fmt(x.r)}</small></span>`;
+  }).join("");
+}
+
+function c17DrawChart(){
+  const cv=$("c17Canvas");
+  if(!cv) return;
+  const dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=cv.clientHeight;
+  if(!w||!h) return;
+  cv.width=w*dpr; cv.height=h*dpr;
+  const ctx=cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+
+  const windowMs=Math.max(120000,(+$("window").value||300)*1000);
+  const now=Date.now(), fromT=now-windowMs;
+  const visible=[...c17Selected].filter(c=>COINS.includes(c));
+  let vals=[];
+  visible.forEach(c=>(series[c]||[]).filter(pt=>pt.t>=fromT).forEach(pt=>vals.push(pt.ret*100)));
+  visible.forEach(c=>{const r=c17GetRet(c);if(r!=null)vals.push(r*100);});
+
+  let min=vals.length?Math.min(...vals):-1, max=vals.length?Math.max(...vals):1;
+  min=Math.min(min,-0.5); max=Math.max(max,0.5);
+  const span=Math.max(1,max-min), pad=span*.12; min-=pad; max+=pad;
+
+  const L=58,R=115,T=28,B=28,pw=w-L-R,ph=h-T-B;
+  if(pw<=0||ph<=0)return;
+
+  ctx.font="10.5px ui-monospace,Menlo,monospace";
+  ctx.strokeStyle="#232c42";ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=T+ph*i/4,v=max-(max-min)*i/4;
+    ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();
+    ctx.fillStyle="#7c8aa5";ctx.fillText((v>=0?"+":"")+v.toFixed(2)+"%",4,y+3.5);
+  }
+
+  if(min<0&&max>0){
+    const yz=T+(max/(max-min))*ph;
+    ctx.strokeStyle="#53627e";ctx.lineWidth=1.2;ctx.setLineDash([5,4]);
+    ctx.beginPath();ctx.moveTo(L,yz);ctx.lineTo(w-R,yz);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle="#aab4c7";ctx.font="10px -apple-system,sans-serif";ctx.fillText("0% 기준선",L+5,yz-5);
+  }
+
+  ctx.font="10px ui-monospace,Menlo,monospace";ctx.fillStyle="#7c8aa5";ctx.textAlign="center";
+  for(let i=0;i<=5;i++){
+    const t=fromT+windowMs*i/5,x=L+((t-fromT)/windowMs)*pw,d=new Date(t);
+    ctx.fillText(d.getHours().toString().padStart(2,"0")+":"+d.getMinutes().toString().padStart(2,"0")+":"+d.getSeconds().toString().padStart(2,"0"),x,h-8);
+  }
+  ctx.textAlign="left";
+
+  const btcRet=c17GetRet("BTC");
+  visible.forEach(sym=>{
+    const raw=(series[sym]||[]).filter(pt=>pt.t>=fromT);
+    const current=c17GetRet(sym), isBTC=sym==="BTC";
+    const strong=!isBTC&&btcRet!=null&&current!=null&&current>btcRet;
+    ctx.strokeStyle=c17Color(sym);ctx.lineWidth=isBTC?3.5:(strong?2.8:1.5);ctx.globalAlpha=isBTC?1:(strong?1:.38);
+    if(raw.length>=2){
+      ctx.beginPath();
+      raw.forEach((pt,i)=>{
+        const x=L+((pt.t-fromT)/windowMs)*pw,y=T+(max-pt.ret*100)/(max-min)*ph;
+        if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+    }else if(current!=null){
+      const y=T+(max-current*100)/(max-min)*ph;
+      ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();
+    }
+    if(current!=null){
+      const y=T+(max-current*100)/(max-min)*ph;
+      ctx.globalAlpha=1;ctx.font=`${isBTC||strong?"800":"600"} 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`;
+      ctx.fillStyle=c17Color(sym);
+      ctx.fillText(`${sym} ${fmt(current)}`,w-R+5,Math.max(T+11,Math.min(h-B-2,y-4)));
+    }
+  });
+  ctx.globalAlpha=1;
+  if(!visible.length||!vals.length){
+    ctx.fillStyle="#7c8aa5";ctx.font="12px -apple-system,sans-serif";ctx.fillText("데이터 수집 중…",L+8,T+ph/2);
+  }
+}
+
+function c17Render(){
+  if(!base.BTC)return;
+  c17DetectBreakouts();c17RenderSelectors();c17RenderSummary();c17RenderBreakouts();c17DrawChart();
+  $("c17LiveDot").classList.add("live");$("c17LiveText").textContent="실시간 수신 중";
+}
+
+$("c17Selectors").addEventListener("click",e=>{
+  const btn=e.target.closest("[data-c17]");
+  if(btn)c17Toggle(btn.dataset.c17);
+});
+$("c17All").onclick=()=>{
+  c17Selected=new Set(COINS);c17RenderSelectors();c17Render();
+};
+$("c17Investment").addEventListener("input",c17RenderSummary);
+
+
 function drawRelChart(){
   const cv = $("chartRel");
   const dpr = window.devicePixelRatio || 1;
@@ -728,7 +1038,9 @@ function drawRelChart(){
 }
 
 setInterval(drawRelChart, 500);
+setInterval(c17DrawChart, 500);
 window.addEventListener("resize", drawRelChart);
+window.addEventListener("resize", c17DrawChart);
 
 /* ---- 기간별(1개월~10년) BTC 대비 상대강도 바 차트 ---- */
 let histCache = {}; // symbol -> [{t, price}, ...] 오름차순, 바이낸스 일봉
@@ -1193,6 +1505,7 @@ if("serviceWorker" in navigator){
 
 renderLegend();
 renderCoinPanel();
+c17EnsureCoins();
 connect();
 loadHistoryFor(COINS);
 loadFng();
