@@ -211,7 +211,10 @@
     .controls{display:grid; grid-template-columns:1fr 1fr; gap:8px}
     .controls select,.controls button{width:100%; min-width:0}
     th,td{font-size:12px; padding:9px 7px}
-    th:nth-child(3),td:nth-child(3){display:none}
+    .tablewrap{overflow-x:auto}
+    th:nth-child(6),td:nth-child(6){display:none}
+    th:nth-child(7),td:nth-child(7){display:none}
+    th:nth-child(8),td:nth-child(8){display:none}
   }
 
   /* ===== 17종 실시간 수익률 비교 모니터 ===== */
@@ -327,6 +330,8 @@
     <div class="card"><div class="k">메이어 배수 (가격÷200일 평균)</div><div class="v mono" id="statMM">--</div><span class="tag zone-muted" id="statMMTag">계산 중</span></div>
     <div class="card"><div class="k">공포·탐욕 지수</div><div class="v mono" id="statFng">--</div><span class="tag zone-muted" id="statFngTag">계산 중</span></div>
     <div class="card"><div class="k">BTC 도미넌스</div><div class="v mono" id="statDom">--</div></div>
+    <div class="card"><div class="k">BTC 24시간</div><div class="v mono" id="btcChg24">--</div></div>
+    <div class="card"><div class="k">BTC 김프</div><div class="v mono" id="btcKimp">--</div></div>
   </div>
 
   <section style="margin-top:0">
@@ -505,10 +510,11 @@
     <div class="sec-head"><h2>코인별 상대강도</h2><span class="hint">기준점 대비 변화율 · 막대는 BTC 대비 상대강도(RS) 크기</span></div>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>코인</th><th>현재 변화</th><th>BTC 대비(RS)</th><th>목표 상승</th><th>목표 하락</th></tr></thead>
+        <thead><tr><th>코인</th><th>가격</th><th>24시간</th><th>김프</th><th>현재 변화</th><th>BTC 대비(RS)</th><th>목표 상승</th><th>목표 하락</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
+    <div class="sec-head" style="margin-top:6px"><span class="hint">가격 = Upbit KRW 현재가 · 24시간 = Upbit 전일 종가 대비 변동률 · 김프 = Upbit KRW ÷ (Binance USDT × USD/KRW) − 1</span></div>
   </section>
 
   <section>
@@ -589,6 +595,7 @@ function afterCoinsChange(){
   renderCoinPanel();
   connect();
   loadHistoryFor(COINS);
+  reconnectMktFeeds();
 }
 function addCoin(raw){
   const sym = (raw||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
@@ -690,8 +697,12 @@ function render(){
     const barWidth = Math.min(100, Math.abs(rel) / 0.03 * 100);
     const barColor = rel >= 0 ? "var(--teal)" : "var(--coral)";
     const barSide = rel >= 0 ? "left:50%;" : `right:50%;`;
+    const m = MKT[c] || {};
     rowsHtml += `<tr>
       <td class="coin"><i class="dot-sw" style="background:${colorFor(c)}"></i>${c}</td>
+      <td class="mono">${mktFmtPrice(m.krw)}</td>
+      <td class="mono ${mktCls(m.krwChg)}">${mktFmtPct(m.krwChg)}</td>
+      <td class="mono ${mktCls(m.premium)}">${mktFmtPct(m.premium)}</td>
       <td class="mono ${r>=0?"pos":"neg"}">${fmt(r)}</td>
       <td class="mono ${rel>=0?"pos":"neg"}">
         ${fmt(rel)}
@@ -759,6 +770,108 @@ function connect(){
   ws.onclose = () => { setConn("재연결 중…", false); setTimeout(connect, 2500); };
 }
 
+/* =========================================================
+   가격 · 24시간 변동 · 김프 실시간 피드
+   - 위쪽 "거래소" 선택(UPBIT/BINANCE)과는 별개로 항상 동시에 수신
+   - Upbit: 현재가(KRW) + 전일 종가 대비 24시간 변동률(signed_change_rate)
+   - Binance: 현재가(USDT) + 24시간 변동률(priceChangePercent)
+   - 김프 = Upbit KRW ÷ (Binance USDT × USD/KRW) − 1
+========================================================= */
+const MKT = {};
+let mktUsdKrw = null;
+let mktUpbitWs = null, mktBinanceWs = null;
+
+function mktSymbols(){ return COINS.slice(0, MAX_COINS); }
+
+function connectMktUpbit(){
+  if(mktUpbitWs){ try{ mktUpbitWs.close(); }catch(e){} }
+  mktUpbitWs = new WebSocket("wss://api.upbit.com/websocket/v1");
+  mktUpbitWs.onopen = () => {
+    mktUpbitWs.send(JSON.stringify([
+      {ticket:"mkt"},
+      {type:"ticker", codes: mktSymbols().map(c => "KRW-" + c), isOnlyRealtime:true},
+      {format:"SIMPLE"}
+    ]));
+  };
+  mktUpbitWs.onmessage = async (e) => {
+    try{
+      const raw = e.data instanceof Blob ? await e.data.text() : e.data;
+      const d = JSON.parse(raw);
+      const code = d.cd || d.code, c = code && code.split("-")[1];
+      if(!c || !mktSymbols().includes(c)) return;
+      MKT[c] = MKT[c] || {};
+      const v = d.tp ?? d.trade_price;
+      if(v != null) MKT[c].krw = +v;
+      const scr = d.scr ?? d.signed_change_rate;
+      if(scr != null) MKT[c].krwChg = +scr * 100;
+      mktRecalc(c);
+    }catch(err){}
+  };
+  mktUpbitWs.onclose = () => { setTimeout(connectMktUpbit, 3000); };
+  mktUpbitWs.onerror = () => { try{ mktUpbitWs.close(); }catch(e){} };
+}
+
+function connectMktBinance(){
+  if(mktBinanceWs){ try{ mktBinanceWs.close(); }catch(e){} }
+  const streams = mktSymbols().map(c => c.toLowerCase() + "usdt@ticker").join("/");
+  mktBinanceWs = new WebSocket("wss://stream.binance.com:9443/stream?streams=" + streams);
+  mktBinanceWs.onmessage = (e) => {
+    try{
+      const d = JSON.parse(e.data).data;
+      const c = mktSymbols().find(q => q.toLowerCase() + "usdt" === (d.s || "").toLowerCase());
+      if(!c) return;
+      MKT[c] = MKT[c] || {};
+      MKT[c].usdt = +d.c;
+      MKT[c].usdtChg = +d.P;
+      mktRecalc(c);
+    }catch(err){}
+  };
+  mktBinanceWs.onclose = () => { setTimeout(connectMktBinance, 3000); };
+  mktBinanceWs.onerror = () => { try{ mktBinanceWs.close(); }catch(e){} };
+}
+
+async function loadMktFx(){
+  try{
+    const r = await fetch("https://open.er-api.com/v6/latest/USD", {cache:"no-store"});
+    if(!r.ok) throw new Error("FX " + r.status);
+    const j = await r.json();
+    mktUsdKrw = +j.rates.KRW;
+    mktSymbols().forEach(mktRecalc);
+  }catch(e){ console.warn("mkt FX load failed:", e.message); }
+}
+
+function mktRecalc(c){
+  const d = MKT[c];
+  if(!d) return;
+  if(d.krw != null && d.usdt != null && mktUsdKrw){
+    d.premium = (d.krw / (d.usdt * mktUsdKrw) - 1) * 100;
+  }
+  render();
+  if(c === "BTC") updateBtcMktCards();
+}
+
+function reconnectMktFeeds(){
+  Object.keys(MKT).forEach(k => { if(!mktSymbols().includes(k)) delete MKT[k]; });
+  connectMktUpbit();
+  connectMktBinance();
+}
+
+function mktFmtPrice(x){
+  if(x == null) return "—";
+  const n = Number(x);
+  if(n >= 1000) return Math.round(n).toLocaleString("ko-KR");
+  if(n >= 1) return n.toLocaleString("ko-KR", {maximumFractionDigits:2});
+  return n.toLocaleString("ko-KR", {maximumFractionDigits:6});
+}
+function mktFmtPct(x){ return x == null ? "—" : (x >= 0 ? "+" : "") + Number(x).toFixed(2) + "%"; }
+function mktCls(x){ return x == null ? "muted" : x > 0 ? "pos" : x < 0 ? "neg" : "muted"; }
+
+function updateBtcMktCards(){
+  const d = MKT.BTC || {};
+  const chgEl = $("btcChg24"), kimpEl = $("btcKimp");
+  if(chgEl){ chgEl.textContent = mktFmtPct(d.krwChg); chgEl.className = "v mono " + mktCls(d.krwChg); }
+  if(kimpEl){ kimpEl.textContent = mktFmtPct(d.premium); kimpEl.className = "v mono " + mktCls(d.premium); }
+}
 
 /* ===== 17종 실시간 수익률 비교 모니터 ===== */
 const C17_COLORS = {
@@ -1511,6 +1624,9 @@ loadHistoryFor(COINS);
 loadFng();
 loadDominance();
 connectBtcUsdFeed();
+reconnectMktFeeds();
+loadMktFx();
+setInterval(loadMktFx, 600000);
 </script>
 </body>
 </html>
